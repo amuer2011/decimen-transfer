@@ -55,7 +55,7 @@ jobs:
         include:
           - os: macos-14
             command: npm run desktop:mac
-            files: artifacts/desktop/*.zip
+            files: artifacts/desktop/*.dmg
           - os: windows-latest
             command: npm run desktop:win
             files: artifacts/desktop/*.exe

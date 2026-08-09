@@ -13,7 +13,7 @@ asar: true
 mac:
   category: public.app-category.utilities
   target:
-    - target: zip
+    - target: dmg
       arch:
         - x64
         - arm64

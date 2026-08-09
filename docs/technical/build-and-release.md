@@ -11,7 +11,7 @@ npm run build             # typecheck (app + node configs), hosted site → dist
 npm run build:standalone  # both self-contained pages → dist-standalone/
 npm run build:all         # everything
 npm run icons             # regenerate public/ icons from the logo (needs librsvg)
-npm run desktop:mac       # macOS x64 + arm64 ZIPs and .app directories
+npm run desktop:mac       # macOS x64 + arm64 DMGs and .app directories
 npm run desktop:win       # Windows x64 portable EXE
 npm run desktop:package   # configured targets for the current platform
 ```
@@ -39,7 +39,7 @@ Recording**. Windows portable output is x64 and requires no installer.
 
 - **`ci.yml`** — tests and builds on every push to `main` / `release/*` and every PR. Asserts the served `receive` chunk stays under 20 KB (catches the inlined worker/wasm leaking into the site build) and that manifest/SW references point at files that exist.
 - **`pages.yml`** — deploys to GitHub Pages on every push to `main`.
-- **`release.yml`** — on a `v*` tag: builds everything, attaches the site, both standalone files, and portable Windows/macOS desktop artifacts.
+- **`release.yml`** — on a `v*` tag: builds everything, attaches the site, both standalone files, and portable Windows/macOS desktop artifacts. macOS artifacts are DMGs.
 
 The site builds with `base: "./"`, so it works under a project subpath with no configuration.
 

@@ -7,7 +7,7 @@ Four shapes, all built from the same source. Built artifacts are attached to eve
 | **Hosted site** | three pages plus a service worker — live at [decimen.app](https://decimen.app/) | yes, any static host | after the first visit |
 | **`decimen-sender.html`** | one file, ~55 KB | no | always |
 | **`decimen-receiver.html`** | one file, ~1.3 MB | see the caveat | always |
-| **Desktop app** | portable Windows EXE or macOS `.app` in a ZIP | no | always |
+| **Desktop app** | portable Windows EXE or macOS `.app` in a DMG | no | always |
 
 ## Hosted site: install and offline
 
@@ -25,8 +25,8 @@ This is the shape to use on a phone: it keeps a real `https://` origin, which is
 The desktop build includes its own Electron runtime and all Decimen assets. On
 Windows, double-click `Decimen Optical Transfer-0.3.0-win-x64.exe`; it is a
 portable x64 executable and needs no installer, Node.js, Python, or npm. On
-macOS, open the ZIP for your CPU (`mac-x64` for Intel or `mac-arm64` for Apple
-Silicon), then double-click the `.app` inside.
+macOS, open the DMG for your CPU (`mac-x64` for Intel or `mac-arm64` for Apple
+Silicon), then drag the `.app` into Applications.
 
 The app's page is served only from `127.0.0.1`. It does not need the cloud
 desktop to have network access. To read a live QR stream from a remote desktop,

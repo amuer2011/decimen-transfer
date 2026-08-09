@@ -38,14 +38,15 @@ confidentiality — see [privacy](docs/user/privacy.md).
 Portable desktop builds are produced in `artifacts/desktop/`:
 
 - Windows x64: `Decimen Optical Transfer-0.3.0-win-x64.exe`
-- macOS Intel: `Decimen Optical Transfer-0.3.0-mac-x64.zip`
-- macOS Apple Silicon: `Decimen Optical Transfer-0.3.0-mac-arm64.zip`
+- macOS Intel: `Decimen Optical Transfer-0.3.0-mac-x64.dmg`
+- macOS Apple Silicon: `Decimen Optical Transfer-0.3.0-mac-arm64.dmg`
 
-The Windows build is a portable EXE. The macOS ZIP contains a double-clickable
-`.app`; the unpacked `.app` directories are also left beside the ZIP after a
-local build. End users do not need Node.js, npm, Python, Electron, or any
-third-party package. The app serves its bundled pages from `127.0.0.1` and
-does not need network access during a transfer.
+The Windows build is a portable EXE. The macOS DMG contains a double-clickable
+`.app`; open the DMG and drag the app to Applications. Unpacked `.app`
+directories are also left beside the DMG after a local build. End users do not
+need Node.js, npm, Python, Electron, or any third-party package. The app serves
+its bundled pages from `127.0.0.1` and does not need network access during a
+transfer.
 
 For live remote-desktop or VM QR capture, run the sender in the cloud desktop,
 open **Receive** in the host desktop app, choose **Screen/window**, and select
@@ -72,7 +73,7 @@ npm run build
 Quick platform builds:
 
 ```bash
-npm run desktop:mac      # macOS Intel + Apple Silicon ZIPs and .app folders
+npm run desktop:mac      # macOS Intel + Apple Silicon DMGs and .app folders
 npm run desktop:win      # Windows x64 portable EXE
 npm run desktop:package  # configured targets for the current platform
 ```
@@ -87,9 +88,10 @@ npx electron-builder --config desktop/electron-builder.yml --win portable
 
 Use the macOS command on a Mac and the Windows command on Windows for the
 most reliable native builds. All desktop output is written to
-`artifacts/desktop/`, including ZIP files, the portable Windows EXE, and
+`artifacts/desktop/`, including DMG files, the portable Windows EXE, and
 temporary unpacked application directories. These generated files are ignored
-by Git and must not be committed.
+by Git and must not be committed. DMGs are intended for GitHub Release assets;
+do not commit them to the source repository.
 
 ## Documentation
 
@@ -121,7 +123,7 @@ npm test                  # golden wire-format vectors and unit tests
 npm run build             # the hosted site → dist/
 npm run build:standalone  # both self-contained pages → dist-standalone/
 npm run build:all         # everything
-npm run desktop:mac       # macOS x64 + arm64 ZIPs and .app directories
+npm run desktop:mac       # macOS x64 + arm64 DMGs and .app directories
 npm run desktop:win       # Windows x64 portable EXE
 npm run desktop:package   # configured targets for the current platform
 ```
