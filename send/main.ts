@@ -88,6 +88,7 @@ let selectedFile: {
 } | null = null;
 let generation = 0; // bumped on every restart; stale loops see it and die
 let resizeDisplay: (() => void) | null = null;
+let fileDragDepth = 0;
 
 const specsLine = statusLine(specs);
 const setStatus = specsLine.setStatus;
@@ -107,8 +108,11 @@ function showError(message: string): void {
   specsLine.showError(message);
 }
 
-function currentMode(): "file" | "snippet" {
-  return modeInputs.find((input) => input.checked)?.value === "snippet" ? "snippet" : "file";
+type SendMode = "file" | "snippet";
+
+function currentMode(): SendMode {
+  const value = modeInputs.find((input) => input.checked)?.value;
+  return value === "snippet" ? "snippet" : "file";
 }
 
 /** The picker reads as state — which file is armed — and the button offers
@@ -120,7 +124,14 @@ function updateFilePicker(): void {
   paneFile.classList.toggle("has-file", armed);
   filePickerButton.textContent = armed ? "Stop transfer" : "Select File";
   filePickerLabel.textContent =
-    armed && selectedFile ? `Selected file: ${selectedFile.name}` : `Any file · up to ${MAX_FILE_LABEL}`;
+    armed && selectedFile
+      ? `Selected file: ${selectedFile.name}`
+      : `Any file · up to ${MAX_FILE_LABEL} · drop here`;
+}
+
+function idlePrompt(mode: SendMode): string {
+  if (mode === "snippet") return "Paste or type some text to begin";
+  return "Choose a file to begin";
 }
 
 /** Tear the stream down and disarm the picker. The input is cleared so the
@@ -134,7 +145,7 @@ function stopTransfer(): void {
   showStreamPanels(false);
   cfgFile.value = "";
   updateFilePicker();
-  setStatus("Choose a file to begin");
+  setStatus(idlePrompt(currentMode()));
 }
 
 /** Tap the code to fill the screen with it — a bigger physical code lets the
@@ -184,9 +195,8 @@ function applyMode(): void {
   paneDemo.hidden = true;
   paneFile.hidden = mode !== "file";
   paneSnippet.hidden = mode !== "snippet";
-  // The heading used to say "Send a file" even with Text snippet selected.
   toolTitle.textContent = mode === "snippet" ? "Send text" : "Send a file";
-  setStatus(mode === "snippet" ? "Paste or type some text to begin" : "Choose a file to begin");
+  setStatus(idlePrompt(mode));
   updateFilePicker();
   // A file left in the picker survives the switch, so re-arm it rather than
   // leaving a filename on screen next to "choose a file to begin".
@@ -235,8 +245,8 @@ async function selectDemo(fileName: string): Promise<void> {
   });
 }
 
-async function selectFile(): Promise<void> {
-  const file = cfgFile.files?.[0];
+async function selectFile(fileOverride?: File): Promise<void> {
+  const file = fileOverride ?? cfgFile.files?.[0];
   if (!file) return;
   await startSelection(`preparing ${file.name}…`, async () => {
     // Checked here, off File.size, rather than after reading the bytes: a file
@@ -253,6 +263,21 @@ async function selectFile(): Promise<void> {
     return { name: file.name, size: file.size, packed: await packFile(file.name, file.type, bytes) };
   });
   updateFilePicker();
+}
+
+function isFileDrag(event: DragEvent): boolean {
+  return Array.from(event.dataTransfer?.types ?? []).includes("Files");
+}
+
+function setFileDragState(active: boolean): void {
+  paneFile.classList.toggle("is-dragover", active);
+  if (!active) {
+    updateFilePicker();
+    return;
+  }
+  const replacing = currentMode() === "file" && selectedFile !== null;
+  filePickerButton.textContent = replacing ? "Drop to replace" : "Drop file";
+  filePickerLabel.textContent = "Release to parse the file";
 }
 
 async function selectSnippet(): Promise<void> {
@@ -278,6 +303,33 @@ async function main() {
     }
   } else {
     cfgFile.addEventListener("change", () => void selectFile());
+    paneFile.addEventListener("dragenter", (event) => {
+      if (!isFileDrag(event)) return;
+      event.preventDefault();
+      fileDragDepth++;
+      setFileDragState(true);
+    });
+    paneFile.addEventListener("dragover", (event) => {
+      if (!isFileDrag(event)) return;
+      event.preventDefault();
+      event.dataTransfer!.dropEffect = "copy";
+      setFileDragState(true);
+    });
+    paneFile.addEventListener("dragleave", (event) => {
+      if (!isFileDrag(event)) return;
+      event.preventDefault();
+      fileDragDepth = Math.max(0, fileDragDepth - 1);
+      if (fileDragDepth === 0) setFileDragState(false);
+    });
+    paneFile.addEventListener("drop", (event) => {
+      if (!isFileDrag(event)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      fileDragDepth = 0;
+      const file = event.dataTransfer?.files[0];
+      setFileDragState(false);
+      if (file) void selectFile(file);
+    });
     // While a file is armed the picker label must NOT open the file dialog:
     // preventDefault cancels the label→input forwarding, and only the button
     // (or a keyboard activation of the hidden input, whose click bubbles up
@@ -314,9 +366,7 @@ async function startStream(revealStage = false) {
   // Stale until this stream's first frame locks its version and refills them.
   showStreamPanels(false);
   if (!selectedFile) {
-    setStatus(
-      currentMode() === "snippet" ? "Paste or type some text to begin" : "Choose a file to begin",
-    );
+    setStatus(idlePrompt(currentMode()));
     return;
   }
   const { name, size: fileSize, payload, compression, transmittedSize } = selectedFile;

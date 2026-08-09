@@ -21,10 +21,20 @@
       <section class="receiver-primary">
         <div class="receiver-heading">
           <div>
-            <p class="eyebrow">Camera → your device</p>
+            <p class="eyebrow" id="source-eyebrow">Camera → your device</p>
             <h1>Receive</h1>
           </div>
           <div class="hint status-line" id="stats">Ready to scan a file or text stream</div>
+        </div>
+        <div class="mode-picker receive-mode-picker" id="receive-mode-picker" role="radiogroup" aria-label="Input source">
+          <label>
+            <input type="radio" name="receive-source" value="camera" checked />
+            <span>Camera</span>
+          </label>
+          <label>
+            <input type="radio" name="receive-source" value="screen" />
+            <span>Screen/window</span>
+          </label>
         </div>
         <button id="start">Start camera</button>
         <!-- The zone exists so the toast can hang just above the camera box:
@@ -55,6 +65,10 @@
               ><div id="bar"></div></div>
             </div>
           </div>
+        </div>
+        <div class="receive-actions" id="receive-controls" hidden>
+          <button id="pause-receive" class="secondary-button" type="button" aria-pressed="false">Pause</button>
+          <button id="cancel-receive" class="secondary-button danger-button" type="button">Cancel</button>
         </div>
         <div id="result"></div>
         <dialog class="help-dialog" id="no-signal-dialog" aria-labelledby="no-signal-title">
@@ -93,7 +107,7 @@
               <select id="cfg-workers"><option>1</option><option selected>2</option><option>3</option></select>
             </label>
           </div>
-          <p class="hint settings-actual" id="camera-actual">Applied when the camera starts.</p>
+          <p class="hint settings-actual" id="capture-actual">Applied when the input starts.</p>
         </details>
       </section>
     </main>

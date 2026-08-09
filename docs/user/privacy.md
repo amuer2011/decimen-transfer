@@ -6,6 +6,8 @@
 
 **Integrity is checked.** Every received file is verified against its SHA-256 before being offered; a corrupted stream fails loudly rather than handing over damaged bytes.
 
+**Screen capture is explicit.** The receiver asks the browser or desktop app to let you choose a display, window, or tab. Screen input is decoded from in-memory frames on the host and is not uploaded or recorded. Do not select a window containing information you do not want transferred through the optical link.
+
 ## What persists on the receiving device
 
 - **Text snippets: nothing.** Shown with a Copy button, gone when the tab closes.

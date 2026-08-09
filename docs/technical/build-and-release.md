@@ -11,7 +11,21 @@ npm run build             # typecheck (app + node configs), hosted site → dist
 npm run build:standalone  # both self-contained pages → dist-standalone/
 npm run build:all         # everything
 npm run icons             # regenerate public/ icons from the logo (needs librsvg)
+npm run desktop:mac       # macOS x64 + arm64 ZIPs and .app directories
+npm run desktop:win       # Windows x64 portable EXE
+npm run desktop:package   # configured targets for the current platform
 ```
+
+Desktop output goes to `artifacts/desktop/`. Packaging downloads the Electron
+runtime during the build, but the resulting Windows EXE and macOS app contain
+everything needed at runtime. The packaged app starts a random-port HTTP server
+bound to `127.0.0.1`; it does not expose a LAN service or require a network
+connection for transfers.
+
+The macOS app is unsigned unless the builder machine has an Apple signing
+identity. The first launch may require **Open** from the Finder context menu,
+and screen capture may require **System Settings → Privacy & Security → Screen
+Recording**. Windows portable output is x64 and requires no installer.
 
 `npm run icons` strips the logo SVG's comments before rasterizing (a `--` inside a comment is invalid XML that browsers tolerate but librsvg rejects) and does exact-match surgery on the markup, throwing if the logo changes shape.
 
@@ -25,7 +39,7 @@ npm run icons             # regenerate public/ icons from the logo (needs librsv
 
 - **`ci.yml`** — tests and builds on every push to `main` / `release/*` and every PR. Asserts the served `receive` chunk stays under 20 KB (catches the inlined worker/wasm leaking into the site build) and that manifest/SW references point at files that exist.
 - **`pages.yml`** — deploys to GitHub Pages on every push to `main`.
-- **`release.yml`** — on a `v*` tag: builds everything, attaches `decimen-<tag>-site.zip`, both standalone files, and `SHA256SUMS.txt`.
+- **`release.yml`** — on a `v*` tag: builds everything, attaches the site, both standalone files, and portable Windows/macOS desktop artifacts.
 
 The site builds with `base: "./"`, so it works under a project subpath with no configuration.
 

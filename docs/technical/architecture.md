@@ -8,7 +8,12 @@ Three pages, one shared core, a handful of single-purpose build plugins. No fram
 |---|---|---|
 | `/` | home: cards, share dialog | `home/main.ts` |
 | `send/` | file/snippet → fountain-coded QR stream on a canvas | `send/main.ts` |
-| `receive/` | camera → WASM QR decode in workers → fountain decoder → file | `receive/main.ts`, `receive/worker.ts` |
+| `receive/` | camera or screen capture → WASM QR decode in workers → fountain decoder → file | `receive/main.ts`, `receive/worker.ts` |
+
+The desktop package wraps the same `dist/` pages in Electron. `desktop/main.cjs`
+serves them only on loopback, handles the native display/window source picker,
+and leaves decoding in the renderer's in-memory video frames. No cloud service
+or runtime package manager is involved.
 
 ## Shared modules (`shared/`)
 

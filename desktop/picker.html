@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'" />
+    <title>Capture screen</title>
+    <link rel="stylesheet" href="./picker.css" />
+  </head>
+  <body>
+    <main class="picker-shell">
+      <section class="picker-page" id="source-page" aria-labelledby="source-title">
+        <header class="picker-header">
+          <div>
+            <p class="eyebrow">Desktop input</p>
+            <h1 id="source-title">Choose a screen or window</h1>
+            <p class="subhead">Select the VM or remote-desktop window showing the changing QR code.</p>
+          </div>
+          <button class="quiet-button" id="cancel-top" type="button">Cancel</button>
+        </header>
+        <div class="source-groups" id="source-groups" aria-live="polite">
+          <div class="loading-state">Loading available screens and windows...</div>
+        </div>
+      </section>
+
+      <section class="picker-page preview-page" id="preview-page" aria-labelledby="preview-title" hidden>
+        <header class="picker-header">
+          <div>
+            <p class="eyebrow">Source preview</p>
+            <h1 id="preview-title">Check this source</h1>
+            <p class="subhead">Make sure the animated QR code is visible before starting the live read.</p>
+          </div>
+          <button class="quiet-button" id="back-button" type="button">Back to sources</button>
+        </header>
+        <div class="preview-layout">
+          <div class="preview-frame" id="preview-frame">
+            <div class="empty-preview">No preview available</div>
+          </div>
+          <aside class="preview-details">
+            <div class="source-mark" id="preview-mark" aria-hidden="true"></div>
+            <p class="preview-kind" id="preview-kind">Window</p>
+            <h2 id="preview-name">Selected source</h2>
+            <p class="preview-note">The receiver will read changing frames directly from this source in memory. It will not create PNG files or record a video.</p>
+            <div class="preview-actions">
+              <button class="primary-button" id="use-button" type="button">Start live read</button>
+              <button class="quiet-button" id="cancel-preview" type="button">Cancel</button>
+            </div>
+          </aside>
+        </div>
+      </section>
+    </main>
+    <script src="./picker-renderer.js"></script>
+  </body>
+</html>

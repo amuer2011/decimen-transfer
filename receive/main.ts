@@ -1,7 +1,8 @@
-// Receiver: camera → WASM QR decode in workers → fountain decoder → file.
+// Receiver: camera or screen capture → WASM QR decode in workers → fountain
+// decoder → file.
 //
 // Field lessons baked in:
-// - iOS treats `frameRate: {ideal: 60}` as a suggestion and delivers 30.
+// - iOS treats camera `frameRate: {ideal: 60}` as a suggestion and delivers 30.
 //   Demand `exact` first (it works at 1280-wide), fall back to `ideal`.
 // - requestVideoFrameCallback chains survive a stopped stream and resume on
 //   the next one — a generation counter prevents zombie capture loops.
@@ -36,7 +37,13 @@ import { applyAdvancedConstraint, probeCameraCapabilities } from "../shared/plat
 import { closeOnBackdropClick } from "../shared/dialog";
 
 const startBtn = document.getElementById("start") as HTMLButtonElement;
+const receiveControls = document.getElementById("receive-controls")!;
+const pauseReceiveBtn = document.getElementById("pause-receive") as HTMLButtonElement;
+const cancelReceiveBtn = document.getElementById("cancel-receive") as HTMLButtonElement;
 const video = document.getElementById("video") as HTMLVideoElement;
+const sourceEyebrow = document.getElementById("source-eyebrow")!;
+const sourcePicker = document.getElementById("receive-mode-picker")!;
+const sourceInputs = [...document.querySelectorAll<HTMLInputElement>('input[name="receive-source"]')];
 const preview = document.getElementById("preview")!;
 const stats = document.getElementById("stats")!;
 const progressEl = document.getElementById("progress")!;
@@ -51,7 +58,7 @@ const settingsEl = document.getElementById("settings")!;
 const cfgWidth = document.getElementById("cfg-width") as HTMLSelectElement;
 const cfgCapFps = document.getElementById("cfg-capfps") as HTMLSelectElement;
 const cfgWorkers = document.getElementById("cfg-workers") as HTMLSelectElement;
-const cameraActual = document.getElementById("camera-actual")!;
+const captureActual = document.getElementById("capture-actual")!;
 const noSignalToast = document.getElementById("no-signal")!;
 const noSignalDialog = document.getElementById("no-signal-dialog") as HTMLDialogElement;
 const noSignalTips = document.getElementById("no-signal-tips")!;
@@ -69,20 +76,71 @@ const NO_SIGNAL_DISMISSED_MS = 15_000;
 // drift apart.
 const STATS_WINDOW_MS = 2000;
 
+type ReceiveSource = "camera" | "screen";
+
 let stream: MediaStream | null = null;
+let activeSource: ReceiveSource | null = null;
 let decoder: LTDecoder | null = null;
 let streamKey = "";
 let startTs = 0;
 let captureGen = 0;
 let done = false;
+let paused = false;
 let settingsWired = false;
 let statsTimer: ReturnType<typeof setInterval> | undefined;
 
-const noSignal = new NoSignalHintTimer(NO_SIGNAL_FIRST_MS, NO_SIGNAL_DISMISSED_MS);
+const createNoSignal = () => new NoSignalHintTimer(NO_SIGNAL_FIRST_MS, NO_SIGNAL_DISMISSED_MS);
+let noSignal = createNoSignal();
 const pool = new DecodeWorkerPool(createDecodeWorker, (bytes) => onDecoded(bytes));
 const captureTimes: number[] = [];
 const decodeTimes: number[] = [];
 startBtn.onclick = () => void start();
+pauseReceiveBtn.onclick = () => void togglePause();
+cancelReceiveBtn.onclick = cancelReceive;
+
+function updateReceiveControls(): void {
+  const active = Boolean(stream && activeSource) && !done;
+  receiveControls.hidden = !active;
+  pauseReceiveBtn.textContent = paused ? "Resume" : "Pause";
+  pauseReceiveBtn.setAttribute("aria-pressed", String(paused));
+}
+
+function resetNoSignal(): void {
+  noSignal = createNoSignal();
+  noSignalToast.hidden = true;
+}
+
+function currentSource(): ReceiveSource {
+  return sourceInputs.find((input) => input.checked)?.value === "screen" ? "screen" : "camera";
+}
+
+function sourceLabel(source: ReceiveSource = currentSource()): string {
+  return source === "screen" ? "screen capture" : "camera";
+}
+
+function setSearchingStatus(): void {
+  const settings = stream?.getVideoTracks()[0]?.getSettings();
+  setStatus(
+    settings
+      ? `${sourceLabel(activeSource ?? currentSource())} ${settings.width}×${settings.height}@${settings.frameRate} — searching for a stream…`
+      : `${sourceLabel(activeSource ?? currentSource())} — searching for a stream…`,
+  );
+}
+
+function updateSourceMode(): void {
+  const source = currentSource();
+  const screen = source === "screen";
+  sourceEyebrow.textContent = screen ? "Screen/window → your device" : "Camera → your device";
+  if (!stream) {
+    startBtn.textContent = screen ? "Capture screen" : "Start camera";
+    captureActual.textContent = screen
+      ? "Choose the remote-desktop or VM window when the system picker opens."
+      : "Applied when the camera starts.";
+  }
+  renderNoSignalTips(source);
+}
+
+for (const input of sourceInputs) input.addEventListener("change", updateSourceMode);
 
 // The header nav markup is shared verbatim between both tool pages; each page
 // marks its own link. Optional because the standalone build swaps the nav for
@@ -91,19 +149,32 @@ document.querySelector('.mode-nav a[href="../receive/"]')?.setAttribute("aria-cu
 
 const { setStatus, showError } = statusLine(stats);
 
-// The toast asks one question; the answers live in the dialog. The tip list is
-// built here rather than in the HTML so its numbers stay tied to the shared
-// send-settings constants the sender's controls are rendered from.
-for (const line of [
-  `On the sender, open Transfer settings and drop bytes / frame to ${NO_SIGNAL_HINT_FRAME_BYTES}.`,
-  `Still nothing? Drop the sender's tx fps to ${NO_SIGNAL_HINT_TX_FPS} as well.`,
-  "Fill this camera's view with the code, and prop the phone against something — autofocus hunting from hand tremor is the usual culprit.",
-  "Turn the sending screen's brightness all the way up.",
-]) {
-  const item = document.createElement("li");
-  item.textContent = line;
-  noSignalTips.append(item);
+// The toast asks one question; the answers live in the dialog. The list is
+// rebuilt when the source changes so camera advice never appears for a screen
+// capture session, and the sender tuning numbers stay canonical.
+function renderNoSignalTips(source: ReceiveSource): void {
+  const lines = source === "screen"
+    ? [
+        `On the sender, open Transfer settings and drop bytes / frame to ${NO_SIGNAL_HINT_FRAME_BYTES}.`,
+        `Still nothing? Drop the sender's tx fps to ${NO_SIGNAL_HINT_TX_FPS} as well.`,
+        "Keep the VM or remote-desktop window visible and updating; some systems pause covered or minimized window capture.",
+        "Select the remote-desktop window in the system picker, not this receiver tab.",
+      ]
+    : [
+        `On the sender, open Transfer settings and drop bytes / frame to ${NO_SIGNAL_HINT_FRAME_BYTES}.`,
+        `Still nothing? Drop the sender's tx fps to ${NO_SIGNAL_HINT_TX_FPS} as well.`,
+        "Fill this camera's view with the code, and prop the phone against something — autofocus hunting from hand tremor is the usual culprit.",
+        "Turn the sending screen's brightness all the way up.",
+      ];
+  noSignalTips.replaceChildren();
+  for (const line of lines) {
+    const item = document.createElement("li");
+    item.textContent = line;
+    noSignalTips.append(item);
+  }
 }
+
+renderNoSignalTips(currentSource());
 
 document.getElementById("no-signal-help")!.addEventListener("click", () => {
   noSignalDialog.showModal();
@@ -137,73 +208,100 @@ function restartButton(label: string): HTMLButtonElement {
  *  a reload. Tapping "Block" by accident on the permission prompt is easy, and
  *  a dead page with no button is a bad answer to it. */
 function offerRetry(message: string) {
+  paused = false;
   startBtn.disabled = false;
   startBtn.style.display = "";
-  startBtn.textContent = "Start camera";
+  sourcePicker.style.display = "";
+  for (const input of sourceInputs) input.disabled = false;
+  updateSourceMode();
   preview.style.display = "none";
   metricsEl.style.display = "none";
   if (diagnosticsEl) diagnosticsEl.style.display = "none";
+  updateReceiveControls();
   showError(message);
 }
 
 async function start() {
-  if (!navigator.mediaDevices?.getUserMedia) {
-    // On insecure origins the API doesn't exist AT ALL — this is the plain-
-    // http-over-LAN case. localhost is exempt; other hosts need https.
+  if (stream || activeSource) return;
+  const source = currentSource();
+  const supported = source === "screen"
+    ? navigator.mediaDevices?.getDisplayMedia
+    : navigator.mediaDevices?.getUserMedia;
+  if (!supported) {
+    // On insecure origins the media APIs do not exist AT ALL — this is the
+    // plain-http-over-LAN case. localhost is exempt; other hosts need https.
     showError(
-      "camera needs a secure context — this page must be served over https to " +
-        "use the camera from another device. `npm run dev` already is.",
+      `${sourceLabel(source)} needs a secure context — this page must be served over https. ` +
+        "`npm run dev` already is.",
     );
     return;
   }
+  done = false;
+  paused = false;
+  resetNoSignal();
   const captureWidth = Number(cfgWidth.value);
   const captureFps = Number(cfgCapFps.value);
   // Nothing on the page changes until the camera is actually running: the
   // error paths below all have to leave a usable Start button behind.
   startBtn.disabled = true;
+  for (const input of sourceInputs) input.disabled = true;
   startBtn.textContent = "Starting…";
   const base: MediaTrackConstraints = {
-    facingMode: "environment",
     width: { ideal: captureWidth },
-    height: { ideal: Math.round((captureWidth * 3) / 4) },
+    ...(source === "camera"
+      ? { facingMode: "environment", height: { ideal: Math.round((captureWidth * 3) / 4) } }
+      : {}),
   };
   try {
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        audio: false,
-        video: { ...base, frameRate: { exact: captureFps } },
-      });
-    } catch {
-      stream = await navigator.mediaDevices.getUserMedia({
+    if (source === "screen") {
+      // Display capture constraints may use `ideal`, but browsers reject the
+      // camera-style `exact` form. The system picker is shown directly from
+      // this click path; no file or recording is created.
+      stream = await navigator.mediaDevices.getDisplayMedia({
         audio: false,
         video: { ...base, frameRate: { ideal: captureFps } },
       });
+    } else {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: { ...base, frameRate: { exact: captureFps } },
+        });
+      } catch {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: { ...base, frameRate: { ideal: captureFps } },
+        });
+      }
     }
   } catch (err) {
-    const denied = err instanceof DOMException && err.name === "NotAllowedError";
+    const denied =
+      err instanceof DOMException &&
+      (err.name === "NotAllowedError" || err.name === "AbortError");
     offerRetry(
       denied
-        ? "camera permission denied — allow it, then tap Start camera again."
-        : `camera: ${err instanceof Error ? err.message : String(err)}`,
+        ? `${sourceLabel(source)} permission denied or selection cancelled — try again.`
+        : `${sourceLabel(source)}: ${err instanceof Error ? err.message : String(err)}`,
     );
     return;
   }
 
+  activeSource = source;
   startBtn.style.display = "none";
+  sourcePicker.style.display = "none";
   // "": back to the stylesheet's flex — the zone centers the camera box.
   preview.style.display = "";
   metricsEl.style.display = "grid";
   if (diagnosticsEl) diagnosticsEl.style.display = "block";
+  updateReceiveControls();
   video.srcObject = stream;
   await video.play().catch(() => undefined);
-  const settings = stream.getVideoTracks()[0]?.getSettings();
-  setStatus(
-    `camera ${settings?.width}×${settings?.height}@${settings?.frameRate} — searching for a stream…`,
-  );
+  setSearchingStatus();
 
   pool.resize(Number(cfgWorkers.value));
-  reportCameraSettings();
-  void applyCameraExtras();
+  reportCaptureSettings();
+  void applyCaptureExtras();
+  stream.getVideoTracks()[0]?.addEventListener("ended", handleCaptureEnded, { once: true });
   if (!settingsWired) {
     settingsWired = true;
     for (const el of [cfgWidth, cfgCapFps, cfgWorkers]) {
@@ -218,25 +316,130 @@ async function start() {
   await requestScreenWakeLock();
 }
 
-/** Report what the camera actually negotiated — iOS in particular will happily
- *  hand back 30 fps after accepting a request for 60. */
-function reportCameraSettings() {
+/** A user can stop a display share from the browser's system indicator. Leave
+ * the receiver retryable instead of keeping a dead preview and a live worker
+ * pool on screen. `finish()` sets `done` first, so its deliberate track stop
+ * cannot enter this path. */
+function handleCaptureEnded(): void {
+  if (done || !activeSource) return;
+  const source = activeSource;
+  paused = false;
+  captureGen++;
+  stream = null;
+  activeSource = null;
+  video.pause();
+  video.srcObject = null;
+  decoder = null;
+  streamKey = "";
+  clearInterval(statsTimer);
+  statsTimer = undefined;
+  pool.resize(0);
+  preview.style.display = "none";
+  metricsEl.style.display = "none";
+  if (diagnosticsEl) diagnosticsEl.style.display = "none";
+  progressEl.style.display = "none";
+  progressStatus.style.display = "none";
+  noSignalToast.hidden = true;
+  updateReceiveControls();
+  offerRetry(`${sourceLabel(source)} ended — choose the source and try again.`);
+}
+
+function pauseReceive(): void {
+  if (!stream || !activeSource || done || paused) return;
+  paused = true;
+  captureGen++;
+  video.pause();
+  clearInterval(statsTimer);
+  statsTimer = undefined;
+  noSignalToast.hidden = true;
+  setStatus("Paused — tap Resume to continue");
+  updateReceiveControls();
+}
+
+async function resumeReceive(): Promise<void> {
+  if (!stream || !activeSource || done || !paused) return;
+  paused = false;
+  noSignalToast.hidden = true;
+  noSignal.cameraStarted(performance.now());
+  await video.play().catch(() => undefined);
+  if (!stream || !activeSource || done) return;
+  setSearchingStatus();
+  captureGen++;
+  scheduleFrame(captureGen);
+  if (!statsTimer) statsTimer = setInterval(updateStats, 500);
+  updateReceiveControls();
+}
+
+function togglePause(): void {
+  if (paused) void resumeReceive();
+  else pauseReceive();
+}
+
+function cancelReceive(): void {
+  if (!stream && !activeSource) return;
+  const activeStream = stream;
+  paused = false;
+  done = false;
+  captureGen++;
+  activeSource = null;
+  stream = null;
+  video.pause();
+  activeStream?.getTracks().forEach((track) => track.stop());
+  video.srcObject = null;
+  decoder = null;
+  streamKey = "";
+  startTs = 0;
+  clearInterval(statsTimer);
+  statsTimer = undefined;
+  pool.resize(0);
+  captureTimes.length = 0;
+  decodeTimes.length = 0;
+  preview.style.display = "none";
+  metricsEl.style.display = "none";
+  if (diagnosticsEl) diagnosticsEl.style.display = "none";
+  const diagnosticsLabel = diagnosticsEl?.querySelector("summary");
+  if (diagnosticsLabel) diagnosticsLabel.textContent = "Live diagnostics";
+  progressEl.style.display = "none";
+  progressStatus.style.display = "none";
+  bar.style.width = "0%";
+  bar.classList.remove("error");
+  progressEl.setAttribute("aria-valuenow", "0");
+  progressLabel.textContent = "0% · 0 frames";
+  etaLabel.textContent = "Estimating time…";
+  result.replaceChildren();
+  settingsEl.style.display = "";
+  sourcePicker.style.display = "";
+  for (const input of sourceInputs) input.disabled = false;
+  startBtn.disabled = false;
+  startBtn.style.display = "";
+  resetNoSignal();
+  if (noSignalDialog.open) noSignalDialog.close();
+  updateSourceMode();
+  updateReceiveControls();
+  setStatus("Receive cancelled — ready to scan again");
+}
+
+/** Report what the input actually negotiated — iOS in particular will happily
+ *  hand a camera back at 30 fps after accepting a request for 60. */
+function reportCaptureSettings() {
   const track = stream?.getVideoTracks()[0];
   if (!track) return;
   const s = track.getSettings();
   const askedFps = Number(cfgCapFps.value);
   const gotFps = Math.round(s.frameRate ?? 0);
   const fpsNote = gotFps && gotFps !== askedFps ? ` (asked ${askedFps})` : "";
-  cameraActual.textContent =
-    `camera ${s.width}×${s.height} @ ${gotFps} fps${fpsNote} · ${pool.size} decode ` +
+  captureActual.textContent =
+    `${sourceLabel(activeSource ?? currentSource())} ${s.width}×${s.height} @ ${gotFps} fps${fpsNote} · ${pool.size} decode ` +
     `worker${pool.size === 1 ? "" : "s"} · changes apply live`;
 }
 
 /** Use what this camera can actually do, probed rather than UA-sniffed.
  *  Continuous autofocus is applied silently — a lens hunting between frames is
- *  the top decode killer, and a camera that refuses is left as it was. Frame
- *  rates the current mode can't reach are grayed out. */
-async function applyCameraExtras() {
+ *  the top decode killer, and a camera that refuses is left as it was. Screen
+ *  capture has no equivalent focus probe, so its fps options stay available. */
+async function applyCaptureExtras() {
+  for (const option of Array.from(cfgCapFps.options)) option.disabled = false;
+  if (activeSource !== "camera") return;
   const track = stream?.getVideoTracks()[0];
   if (!track) return;
   const caps = probeCameraCapabilities(track);
@@ -258,18 +461,22 @@ async function applyReceiveSettings() {
   if (!track) return;
   const width = Number(cfgWidth.value);
   try {
-    await track.applyConstraints({
+    const constraints: MediaTrackConstraints = {
       width: { ideal: width },
-      height: { ideal: Math.round((width * 3) / 4) },
       frameRate: { ideal: Number(cfgCapFps.value) },
-    });
+    };
+    if (activeSource === "camera") {
+      constraints.height = { ideal: Math.round((width * 3) / 4) };
+    }
+    await track.applyConstraints(constraints);
   } catch {
-    // Some devices (notably iOS) refuse a live reconfigure. Keep the stream we
-    // have rather than tearing down a transfer in progress.
-    cameraActual.textContent = "this camera refused a live change — restart to apply";
+    // Some devices and display sources refuse a live reconfigure. Keep the
+    // input we have rather than tearing down a transfer in progress.
+    captureActual.textContent =
+      `this ${sourceLabel(activeSource ?? currentSource())} refused a live change — restart to apply`;
     return;
   }
-  reportCameraSettings();
+  reportCaptureSettings();
 }
 
 type VideoRVFC = HTMLVideoElement & { requestVideoFrameCallback?: (cb: () => void) => number };
@@ -306,9 +513,10 @@ function captureFrame() {
 }
 
 function onDecoded(bytes: Uint8Array) {
+  if (done || paused || !activeSource) return;
   decodeTimes.push(performance.now());
   const parsed = parseFrame(bytes);
-  if (!parsed || done) return;
+  if (!parsed) return;
   const { header, block } = parsed;
   if (noSignal.frameDecoded()) {
     noSignalToast.hidden = true;
@@ -376,15 +584,22 @@ function goodputKbs(elapsed: number): number {
 
 async function finish(container: Uint8Array, hashOk: boolean, seconds: number) {
   done = true;
+  paused = false;
   captureGen++;
-  // Tear the whole capture pipeline down: the camera, the stats timer, and the
-  // decode pool. Each worker holds its own ~940 KB zxing WASM instance, which
+  // Tear the whole capture pipeline down: the camera/screen stream, stats
+  // timer, and decode pool. Each worker holds its own ~940 KB zxing WASM instance, which
   // is worth reclaiming on a phone the moment the last frame is in.
   stream?.getTracks().forEach((t) => t.stop());
+  stream = null;
+  activeSource = null;
+  video.pause();
+  video.srcObject = null;
   clearInterval(statsTimer);
   statsTimer = undefined;
   pool.resize(0);
   preview.style.display = "none";
+  sourcePicker.style.display = "none";
+  updateReceiveControls();
   // The transfer is over and the pipeline is gone: settings for a camera that
   // no longer exists would just be a dead control panel.
   settingsEl.style.display = "none";

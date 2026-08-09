@@ -5,7 +5,12 @@
 3. On the receiving device (a phone): **Receive**, tap **Start camera**, point it at the code. Fill the camera view with it and prop the phone against something.
 4. When the bar completes, the file appears with a preview and a **Save** link — after its SHA-256 check passes.
 
-To send text instead of a file, flip the sender to **Text snippet** and paste. The receiver is the same page either way.
+To send text instead of a file, flip the sender to **Text snippet** and paste.
+For a live VM or remote-desktop QR stream, run **Send** in the VM/cloud desktop,
+then run **Receive** on the host and choose **Screen/window**. Select the VM or
+RDP window showing the changing QR codes; the host decodes frames directly from
+memory and saves the recovered file locally. This does not create PNG files or
+record a video.
 
 Nothing decoding? See [Troubleshooting](troubleshooting.md).
 

@@ -125,6 +125,23 @@ button:focus-visible {
   background: rgba(255, 123, 114, 0.12);
 }
 
+.file-picker.is-dragover {
+  border-color: var(--accent);
+  background: rgba(var(--accent-rgb), 0.08);
+  outline: 2px dashed var(--accent);
+  outline-offset: 3px;
+}
+
+.file-picker.is-dragover .file-picker-button {
+  color: var(--accent-ink);
+  background: var(--accent-hi);
+  border-color: transparent;
+}
+
+.file-picker.is-dragover .file-picker-text {
+  color: var(--text);
+}
+
 .file-picker-text {
   min-width: 0;
   overflow-wrap: anywhere;
@@ -439,6 +456,21 @@ details.settings input[type="range"] {
     var(--bg);
 }
 
+/* The desktop home screen is a launch surface, not a document. Keep its
+   complete first view inside the Electron window so the landing choices do
+   not create a second browser chrome scrollbar. Tool pages retain normal
+   document flow below. */
+html:has(body.home-page) {
+  height: 100%;
+  overflow: hidden;
+}
+
+body.home-page {
+  height: 100svh;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .home-shell,
 .send-shell,
 .receiver-shell {
@@ -718,6 +750,51 @@ details.settings input[type="range"] {
   letter-spacing: 0.04em;
 }
 
+@media (min-width: 681px) {
+  .home-shell {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: clamp(28px, 5vh, 52px) 0 20px;
+  }
+
+  .hero {
+    margin-bottom: clamp(24px, 4vh, 42px);
+  }
+
+  .hero h1 {
+    font-size: clamp(34px, 4.5vw, 52px);
+  }
+
+  .hero-copy {
+    margin-top: 14px;
+    font-size: clamp(14px, 1.5vw, 17px);
+    line-height: 1.45;
+  }
+
+  .transfer-card {
+    min-height: 0;
+    gap: 20px;
+    padding: clamp(22px, 2.8vw, 34px);
+  }
+
+  .home-page .home-share {
+    margin-top: 16px;
+  }
+
+  .privacy-note {
+    margin-top: 16px;
+  }
+
+  .site-footer {
+    margin-top: 20px;
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+}
+
 /* Name on its own line, version · build · license beneath it — one long line
    wrapped mid-phrase on phones. */
 .footer-id {
@@ -867,7 +944,10 @@ details.settings input[type="range"] {
 }
 
 .mode-picker span {
-  display: block;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 9px 12px;
   border-radius: 7px;
   color: var(--muted);
@@ -985,6 +1065,37 @@ details.settings input[type="range"] {
 .receiver-primary > details.settings,
 .receiver-primary > #result {
   width: 100%;
+}
+
+.receive-mode-picker {
+  width: min(100%, 420px);
+}
+
+.receive-mode-picker input:disabled + span {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.receive-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  width: min(100%, 640px);
+}
+
+.receive-actions .secondary-button {
+  min-width: 116px;
+}
+
+.receive-actions .danger-button {
+  color: var(--red);
+  border-color: var(--red);
+}
+
+.receive-actions .danger-button:hover,
+.receive-actions .danger-button:focus-visible {
+  background: rgba(255, 123, 114, 0.12);
 }
 
 /* Sized to its label, not to the column. At the full 720px it was the same
@@ -1259,6 +1370,13 @@ details.settings input[type="range"] {
 }
 
 @media (max-width: 680px) {
+  html:has(body.home-page),
+  body.home-page {
+    height: auto;
+    min-height: 100svh;
+    overflow: auto;
+  }
+
   .site-header {
     min-height: 50px;
     padding: max(11px, env(safe-area-inset-top)) 14px 11px;

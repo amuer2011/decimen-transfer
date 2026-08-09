@@ -14,10 +14,14 @@ Open it on both devices and go — nothing to install. Works offline after the
 first visit, and installs as an app on both iOS and Android if you want it on
 a home screen.
 
-Files up to 64 MB (or a pasted text snippet), filename and media type
-preserved, gzip only when it helps, SHA-256 verified before anything is
-offered — and received video plays right in the page. Extracted from a larger
-experiment that reached **128 KB/s phone-to-phone**.
+Files up to 64 MB (or a pasted text snippet), filename and media type preserved,
+gzip only when it helps, SHA-256 verified before anything is offered — and
+received video plays right in the page. Extracted from a larger experiment that
+reached **128 KB/s phone-to-phone**.
+
+The receiver can also capture a display, window, or browser tab directly. This
+lets a host read an animated QR stream shown inside a virtual machine or remote
+desktop without using a camera, creating a PNG, or recording a video.
 
 <p align="center">
   <img src="docs/receiving.jpg" width="420"
@@ -28,6 +32,64 @@ experiment that reached **128 KB/s phone-to-phone**.
 Neither mode is encrypted: whatever is on the sending screen is readable by
 any camera pointed at it. The property this gives you is no network, not
 confidentiality — see [privacy](docs/user/privacy.md).
+
+## Desktop packages
+
+Portable desktop builds are produced in `artifacts/desktop/`:
+
+- Windows x64: `Decimen Optical Transfer-0.3.0-win-x64.exe`
+- macOS Intel: `Decimen Optical Transfer-0.3.0-mac-x64.zip`
+- macOS Apple Silicon: `Decimen Optical Transfer-0.3.0-mac-arm64.zip`
+
+The Windows build is a portable EXE. The macOS ZIP contains a double-clickable
+`.app`; the unpacked `.app` directories are also left beside the ZIP after a
+local build. End users do not need Node.js, npm, Python, Electron, or any
+third-party package. The app serves its bundled pages from `127.0.0.1` and
+does not need network access during a transfer.
+
+For live remote-desktop or VM QR capture, run the sender in the cloud desktop,
+open **Receive** in the host desktop app, choose **Screen/window**, and select
+the RDP/VM window that shows the changing QR codes. The recovered file is then
+saved through the host app's **Save** action.
+
+The desktop receiver protects its own window from whole-display capture and
+filters it out of the window list, preventing a capture feedback loop.
+
+### Build desktop packages
+
+Run these commands from the repository root. The build machine needs Node.js
+and npm. The first `npm ci` installs the development dependencies, and the
+first desktop build may download the Electron runtime. The packaged apps do
+not need Node.js, npm, or an Internet connection on the end user's machine.
+
+```bash
+cd /path/to/decimen-transfer
+npm ci
+npm test
+npm run build
+```
+
+Quick platform builds:
+
+```bash
+npm run desktop:mac      # macOS Intel + Apple Silicon ZIPs and .app folders
+npm run desktop:win      # Windows x64 portable EXE
+npm run desktop:package  # configured targets for the current platform
+```
+
+The same builds can be run manually after the web bundle has been built:
+
+```bash
+npm run build
+npx electron-builder --config desktop/electron-builder.yml --mac
+npx electron-builder --config desktop/electron-builder.yml --win portable
+```
+
+Use the macOS command on a Mac and the Windows command on Windows for the
+most reliable native builds. All desktop output is written to
+`artifacts/desktop/`, including ZIP files, the portable Windows EXE, and
+temporary unpacked application directories. These generated files are ignored
+by Git and must not be committed.
 
 ## Documentation
 
@@ -59,6 +121,9 @@ npm test                  # golden wire-format vectors and unit tests
 npm run build             # the hosted site → dist/
 npm run build:standalone  # both self-contained pages → dist-standalone/
 npm run build:all         # everything
+npm run desktop:mac       # macOS x64 + arm64 ZIPs and .app directories
+npm run desktop:win       # Windows x64 portable EXE
+npm run desktop:package   # configured targets for the current platform
 ```
 
 Open `https://localhost:5173/send/` on the sending device and the printed

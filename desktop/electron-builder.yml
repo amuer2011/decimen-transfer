@@ -1,0 +1,30 @@
+appId: com.decimen.opticaltransfer
+productName: Decimen Optical Transfer
+copyright: Copyright © 2026 Evan Crawley
+icon: public/icon-512.png
+directories:
+  output: artifacts/desktop
+  buildResources: desktop/resources
+files:
+  - desktop/**
+  - dist/**
+  - package.json
+asar: true
+mac:
+  category: public.app-category.utilities
+  target:
+    - target: zip
+      arch:
+        - x64
+        - arm64
+  artifactName: ${productName}-${version}-mac-${arch}.${ext}
+win:
+  target:
+    - target: portable
+      arch:
+        - x64
+  artifactName: ${productName}-${version}-win-${arch}.${ext}
+linux:
+  target:
+    - AppImage
+  artifactName: ${productName}-${version}-linux-${arch}.${ext}
