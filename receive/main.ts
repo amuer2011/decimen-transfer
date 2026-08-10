@@ -823,9 +823,12 @@ function showSnippet(text: string, summaryLine: string) {
   summary.className = "hint";
   summary.textContent = summaryLine;
 
-  const body = document.createElement("p");
-  body.className = "received-note";
-  body.textContent = text;
+  const body = document.createElement("textarea");
+  body.className = "received-note received-snippet";
+  body.value = text;
+  body.readOnly = true;
+  body.spellcheck = false;
+  body.setAttribute("aria-label", "Received text");
 
   const actions = document.createElement("div");
   actions.className = "note-actions";

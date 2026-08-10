@@ -1193,6 +1193,18 @@ body.home-page {
   border-radius: 10px;
 }
 
+.received-snippet {
+  display: block;
+  height: 16rem;
+  overflow: auto;
+  resize: none;
+  font: inherit;
+  line-height: 1.55;
+  cursor: text;
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+}
+
 /* Shown when the camera has run for a while without decoding anything.
    Floats just above the camera box — appearing must not shift the page — and
    stays small enough to ignore: sometimes it just needs another second. */
