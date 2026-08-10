@@ -36,6 +36,15 @@ import { requestScreenWakeLock } from "../shared/wake-lock";
 import { applyAdvancedConstraint, probeCameraCapabilities } from "../shared/platform";
 import { closeOnBackdropClick } from "../shared/dialog";
 
+declare global {
+  interface Window {
+    decimenDesktop?: {
+      onDownloadCompleted(callback: () => void): void;
+      openTargetFolder(): Promise<void>;
+    };
+  }
+}
+
 const startBtn = document.getElementById("start") as HTMLButtonElement;
 const receiveControls = document.getElementById("receive-controls")!;
 const pauseReceiveBtn = document.getElementById("pause-receive") as HTMLButtonElement;
@@ -679,6 +688,31 @@ async function finish(container: Uint8Array, hashOk: boolean, seconds: number) {
     const actions = document.createElement("div");
     actions.className = "note-actions";
     actions.append(download);
+    const desktop = window.decimenDesktop;
+    if (desktop) {
+      const openFolder = document.createElement("button");
+      openFolder.type = "button";
+      openFolder.className = "secondary-button";
+      openFolder.textContent = "Open target folder";
+      openFolder.hidden = true;
+      desktop.onDownloadCompleted(() => {
+        openFolder.hidden = false;
+      });
+      openFolder.addEventListener("click", async () => {
+        openFolder.disabled = true;
+        try {
+          await desktop.openTargetFolder();
+        } catch {
+          openFolder.textContent = "Open folder failed";
+          setTimeout(() => {
+            openFolder.textContent = "Open target folder";
+          }, 1500);
+        } finally {
+          openFolder.disabled = false;
+        }
+      });
+      actions.append(openFolder);
+    }
     const endActions = document.createElement("div");
     endActions.className = "note-actions";
     endActions.append(restartButton("Receive another file"));

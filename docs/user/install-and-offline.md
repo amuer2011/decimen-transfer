@@ -23,7 +23,7 @@ This is the shape to use on a phone: it keeps a real `https://` origin, which is
 ## Portable desktop apps
 
 The desktop build includes its own Electron runtime and all Decimen assets. On
-Windows, double-click `Decimen Optical Transfer-0.3.0-win-x64.exe`; it is a
+Windows, double-click `Decimen.Optical.Transfer-v1.0.1-win-x64.exe`; it is a
 portable x64 executable and needs no installer, Node.js, Python, or npm. On
 macOS, open the DMG for your CPU (`mac-x64` for Intel or `mac-arm64` for Apple
 Silicon), then drag the `.app` into Applications.

@@ -17,14 +17,14 @@ mac:
       arch:
         - x64
         - arm64
-  artifactName: ${productName}-${version}-mac-${arch}.${ext}
+  artifactName: Decimen.Optical.Transfer-v${version}-mac-${arch}.${ext}
 win:
   target:
     - target: portable
       arch:
         - x64
-  artifactName: ${productName}-${version}-win-${arch}.${ext}
+  artifactName: Decimen.Optical.Transfer-v${version}-win-${arch}.${ext}
 linux:
   target:
     - AppImage
-  artifactName: ${productName}-${version}-linux-${arch}.${ext}
+  artifactName: Decimen.Optical.Transfer-v${version}-linux-${arch}.${ext}

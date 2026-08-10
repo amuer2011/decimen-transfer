@@ -13,6 +13,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { URL } = require("node:url");
 const { shouldProtectWindow } = require("./content-protection.cjs");
+const { isCompletedDownload, openTargetFolder } = require("./downloads.cjs");
 
 const PRODUCT_NAME = "Decimen Optical Transfer";
 const DIST_ROOT = path.join(app.getAppPath(), "dist");
@@ -20,6 +21,7 @@ const MAC_SCREEN_CAPTURE_SETTINGS =
   "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture";
 let server;
 let baseUrl;
+let mainWindow;
 let sourcePickerWindow;
 let sourcePickerState;
 
@@ -240,7 +242,17 @@ function configureDisplayCapture() {
 function configureDownloads() {
   // Keep the browser-style Save action in the host user's normal Downloads
   // folder rather than Electron's private application data directory.
-  session.defaultSession.setDownloadPath(app.getPath("downloads"));
+  const downloadsPath = app.getPath("downloads");
+  session.defaultSession.setDownloadPath(downloadsPath);
+  ipcMain.handle("downloads:open-folder", () =>
+    openTargetFolder((folderPath) => shell.openPath(folderPath), downloadsPath),
+  );
+  session.defaultSession.on("will-download", (_event, item) => {
+    item.once("done", (_downloadEvent, state) => {
+      if (!isCompletedDownload(state)) return;
+      mainWindow?.webContents.send("downloads:completed");
+    });
+  });
 }
 
 function requestedFile(requestUrl) {
@@ -311,8 +323,13 @@ async function createWindow() {
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
+      preload: path.join(__dirname, "main-preload.cjs"),
       sandbox: true,
     },
+  });
+  mainWindow = window;
+  window.on("closed", () => {
+    if (mainWindow === window) mainWindow = undefined;
   });
   // A whole-display source is still the full display, but the OS will omit
   // this protected window from the captured pixels instead of feeding the

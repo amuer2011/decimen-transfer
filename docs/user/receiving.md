@@ -33,6 +33,7 @@ Progress counts **frames collected**, not blocks solved — fountain decoding ba
 
 - The file is verified against its SHA-256 before anything is offered.
 - Images, video, and audio preview inline — video plays in the page (never autoplays), other files just get the **Save** link.
+- The desktop app also offers **Open target folder** for the system Downloads directory.
 - **Receive another file** reloads into a fresh receiver.
 - **Clear Decimen cache** scrubs the received bytes from browser storage — see [Privacy](privacy.md).
 - Text snippets appear with a **Copy** button and exist only until the tab closes.

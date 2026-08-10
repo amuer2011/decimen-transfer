@@ -37,9 +37,9 @@ confidentiality — see [privacy](docs/user/privacy.md).
 
 Portable desktop builds are produced in `artifacts/desktop/`:
 
-- Windows x64: `Decimen Optical Transfer-0.3.0-win-x64.exe`
-- macOS Intel: `Decimen Optical Transfer-0.3.0-mac-x64.dmg`
-- macOS Apple Silicon: `Decimen Optical Transfer-0.3.0-mac-arm64.dmg`
+- Windows x64: `Decimen.Optical.Transfer-v1.0.1-win-x64.exe`
+- macOS Intel: `Decimen.Optical.Transfer-v1.0.1-mac-x64.dmg`
+- macOS Apple Silicon: `Decimen.Optical.Transfer-v1.0.1-mac-arm64.dmg`
 
 The Windows build is a portable EXE. The macOS DMG contains a double-clickable
 `.app`; open the DMG and drag the app to Applications. Unpacked `.app`
