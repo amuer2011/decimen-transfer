@@ -39,7 +39,8 @@ Recording**. Windows portable output is x64 and requires no installer.
 
 - **`ci.yml`** — tests and builds on every push to `main` / `release/*` and every PR. Asserts the served `receive` chunk stays under 20 KB (catches the inlined worker/wasm leaking into the site build) and that manifest/SW references point at files that exist.
 - **`pages.yml`** — deploys to GitHub Pages on every push to `main`.
-- **`release.yml`** — on a `v*` tag: builds everything, attaches the site, both standalone files, and portable Windows/macOS desktop artifacts. macOS artifacts are DMGs.
+- **`release.yml`** — on a `v*` tag: builds and publishes the hosted site and both standalone files.
+- **`desktop-release.yml`** — on the same `v*` tag: builds the x64 and arm64 macOS DMGs plus the x64 portable Windows EXE, then attaches them to the GitHub Release. It also supports manually selecting an existing tag.
 
 The site builds with `base: "./"`, so it works under a project subpath with no configuration.
 
@@ -47,6 +48,6 @@ The site builds with `base: "./"`, so it works under a project subpath with no c
 
 1. `git checkout -b release/vX.Y.Z`, bump version (`npm version X.Y.Z --no-git-tag-version`), commit.
 2. Feature work + docs on the branch; PR to `main`.
-3. Tag `vX.Y.Z` after merge — `release.yml` builds and attaches the artifacts.
+3. Tag `vX.Y.Z` after merge — `release.yml` publishes the web artifacts and `desktop-release.yml` publishes the desktop artifacts.
 
 The footer stamps `v<version> · build <short-hash>` (`-dirty` when uncommitted work is in the build), so any artifact names its exact source.
