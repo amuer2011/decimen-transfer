@@ -42,6 +42,8 @@ Recording**. Windows portable output is x64 and requires no installer.
 - **`release.yml`** — on a `v*` tag: builds and publishes the hosted site and both standalone files.
 - **`desktop-release.yml`** — on the same `v*` tag: builds the x64 and arm64 macOS DMGs plus the x64 portable Windows EXE, then attaches them to the GitHub Release. It also supports manually selecting an existing tag.
 
+Before the first Pages deployment, set **Settings -> Pages -> Build and deployment -> Source** to **GitHub Actions**. The default `GITHUB_TOKEN` can deploy an already-enabled Pages site, but cannot enable Pages for a repository where the site does not exist.
+
 The site builds with `base: "./"`, so it works under a project subpath with no configuration.
 
 ## Release pattern
