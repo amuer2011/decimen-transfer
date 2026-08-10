@@ -1,7 +1,7 @@
 {
   "name": "decimen-optical-transfer",
   "private": true,
-  "version": "1.0.1",
+  "version": "1.0.2",
   "main": "desktop/main.cjs",
   "license": "MIT",
   "description": "Offline file and text transfer using fountain-coded animated QR codes — screen to camera, no network.",
