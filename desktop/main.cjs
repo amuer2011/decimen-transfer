@@ -12,6 +12,7 @@ const http = require("node:http");
 const fs = require("node:fs");
 const path = require("node:path");
 const { URL } = require("node:url");
+const { shouldProtectWindow } = require("./content-protection.cjs");
 
 const PRODUCT_NAME = "Decimen Optical Transfer";
 const DIST_ROOT = path.join(app.getAppPath(), "dist");
@@ -316,7 +317,10 @@ async function createWindow() {
   // A whole-display source is still the full display, but the OS will omit
   // this protected window from the captured pixels instead of feeding the
   // receiver UI back into its own QR decoder.
-  window.setContentProtection(true);
+  // Older Windows builds can render a protected Electron window as black.
+  if (shouldProtectWindow(process.platform, process.getSystemVersion())) {
+    window.setContentProtection(true);
+  }
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   await window.loadURL(`${baseUrl}${initialPath()}`);
 }
