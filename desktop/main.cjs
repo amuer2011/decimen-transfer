@@ -17,6 +17,12 @@ const { isCompletedDownload, openTargetFolder } = require("./downloads.cjs");
 
 const PRODUCT_NAME = "Decimen Optical Transfer";
 const DIST_ROOT = path.join(app.getAppPath(), "dist");
+// Linux window managers (UKUI included) read _NET_WM_ICON for the taskbar
+// button. Chromium silently drops icons whose pixel payload would push the
+// property past the X11 request limit, so 512x512 leaves _NET_WM_ICON empty;
+// 192x192 stays well inside it and is still larger than any panel draws.
+// Vite copies public/icon-192.png to the dist root, which ships inside the asar.
+const APP_ICON = path.join(DIST_ROOT, "icon-192.png");
 const MAC_SCREEN_CAPTURE_SETTINGS =
   "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture";
 let server;
@@ -74,6 +80,7 @@ function showSourcePicker(parentWindow, sources) {
       minWidth: 720,
       minHeight: 500,
       title: "Capture screen",
+      icon: APP_ICON,
       backgroundColor: "#070a11",
       parent: parentWindow && !parentWindow.isDestroyed() ? parentWindow : undefined,
       modal: Boolean(parentWindow && !parentWindow.isDestroyed()),
@@ -319,6 +326,7 @@ async function createWindow() {
     minWidth: 420,
     minHeight: 560,
     title: PRODUCT_NAME,
+    icon: APP_ICON,
     backgroundColor: "#070a11",
     webPreferences: {
       contextIsolation: true,

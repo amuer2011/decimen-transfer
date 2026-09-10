@@ -33,6 +33,12 @@ linux:
   # the target UKUI session.
   executableArgs:
     - --ozone-platform=x11
+  desktop:
+    entry:
+      # Electron reports WM_CLASS "decimen-optical-transfer" (from the
+      # executable name). electron-builder defaults this key to productName,
+      # which never matches, so UKUI cannot find the icon for the window.
+      StartupWMClass: decimen-optical-transfer
   target:
     - target: deb
       arch:
