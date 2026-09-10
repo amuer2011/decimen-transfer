@@ -13,14 +13,15 @@ npm run build:all         # everything
 npm run icons             # regenerate public/ icons from the logo (needs librsvg)
 npm run desktop:mac       # macOS x64 + arm64 DMGs and .app directories
 npm run desktop:win       # Windows x64 portable EXE
+npm run desktop:kylin     # Kylin Linux arm64 DEB
 npm run desktop:package   # configured targets for the current platform
 ```
 
 Desktop output goes to `artifacts/desktop/`. Packaging downloads the Electron
-runtime during the build, but the resulting Windows EXE and macOS app contain
-everything needed at runtime. The packaged app starts a random-port HTTP server
-bound to `127.0.0.1`; it does not expose a LAN service or require a network
-connection for transfers.
+runtime during the build, but the resulting Windows EXE, macOS app, and Kylin
+arm64 DEB contain the application runtime. The packaged app starts a
+random-port HTTP server bound to `127.0.0.1`; it does not expose a LAN service
+or require a network connection for transfers.
 
 The macOS app is unsigned unless the builder machine has an Apple signing
 identity. The first launch may require **Open** from the Finder context menu,
@@ -40,7 +41,8 @@ Recording**. Windows portable output is x64 and requires no installer.
 - **`ci.yml`** — tests and builds on every push to `main` / `release/*` and every PR. Asserts the served `receive` chunk stays under 20 KB (catches the inlined worker/wasm leaking into the site build) and that manifest/SW references point at files that exist.
 - **`pages.yml`** — deploys to GitHub Pages on every push to `main`.
 - **`release.yml`** — on a `v*` tag: builds and publishes the hosted site and both standalone files.
-- **`desktop-release.yml`** — on the same `v*` tag: builds the x64 and arm64 macOS DMGs plus the x64 portable Windows EXE, then attaches them to the GitHub Release. It also supports manually selecting an existing tag.
+- **`kylin-desktop.yml`** — on pushes to `main` / `release/*`: builds and uploads a Kylin Linux arm64 DEB as a workflow artifact.
+- **`desktop-release.yml`** — on the same `v*` tag: builds the Kylin Linux arm64 DEB, x64 and arm64 macOS DMGs, and x64 portable Windows EXE, then attaches them to the GitHub Release. It also supports manually selecting an existing tag.
 
 Before the first Pages deployment, set **Settings -> Pages -> Build and deployment -> Source** to **GitHub Actions**. The default `GITHUB_TOKEN` can deploy an already-enabled Pages site, but cannot enable Pages for a repository where the site does not exist.
 

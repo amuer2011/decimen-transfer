@@ -7,7 +7,7 @@ Four shapes, all built from the same source. Built artifacts are attached to eve
 | **Hosted site** | three pages plus a service worker — live at [decimen.app](https://decimen.app/) | yes, any static host | after the first visit |
 | **`decimen-sender.html`** | one file, ~55 KB | no | always |
 | **`decimen-receiver.html`** | one file, ~1.3 MB | see the caveat | always |
-| **Desktop app** | portable Windows EXE or macOS `.app` in a DMG | no | always |
+| **Desktop app** | Kylin arm64 DEB, portable Windows EXE, or macOS `.app` in a DMG | no | always |
 
 ## Hosted site: install and offline
 
@@ -23,7 +23,14 @@ This is the shape to use on a phone: it keeps a real `https://` origin, which is
 ## Portable desktop apps
 
 The desktop build includes its own Electron runtime and all Decimen assets. On
-Windows, double-click `Decimen.Optical.Transfer-v1.0.1-win-x64.exe`; it is a
+Kylin Linux V10 arm64, install the package through APT so system dependencies
+are checked automatically:
+
+```bash
+sudo apt install ./Decimen.Optical.Transfer-<version>-kylin-aarch64.deb
+```
+
+On Windows, double-click `Decimen.Optical.Transfer-v1.0.1-win-x64.exe`; it is a
 portable x64 executable and needs no installer, Node.js, Python, or npm. On
 macOS, open the DMG for your CPU (`mac-x64` for Intel or `mac-arm64` for Apple
 Silicon), then drag the `.app` into Applications.

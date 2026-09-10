@@ -75,10 +75,50 @@ jobs:
           path: artifacts/desktop/*.exe
           if-no-files-found: error
 
+  build-kylin:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Kylin arm64 package
+        run: npm run desktop:kylin
+
+      - name: Verify package name and architecture
+        id: package
+        shell: bash
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          deb="artifacts/desktop/Decimen.Optical.Transfer-${version}-kylin-aarch64.deb"
+          test -f "$deb"
+          test "$(dpkg-deb -f "$deb" Architecture)" = "arm64"
+          echo "deb=$deb" >> "$GITHUB_OUTPUT"
+
+      - name: Upload Kylin artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kylin-aarch64-release
+          path: ${{ steps.package.outputs.deb }}
+          if-no-files-found: error
+          compression-level: 0
+
   release:
     needs:
       - build-mac
       - build-windows
+      - build-kylin
     runs-on: ubuntu-latest
     steps:
       - name: Download artifacts
@@ -95,3 +135,4 @@ jobs:
           files: |
             release/mac-release/*.dmg
             release/windows-release/*.exe
+            release/kylin-aarch64-release/*.deb

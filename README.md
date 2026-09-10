@@ -37,14 +37,17 @@ confidentiality — see [privacy](docs/user/privacy.md).
 
 Portable desktop builds are produced in `artifacts/desktop/`:
 
+- Kylin Linux arm64: `Decimen.Optical.Transfer-<version>-kylin-aarch64.deb`
 - Windows x64: `Decimen.Optical.Transfer-v1.0.1-win-x64.exe`
 - macOS Intel: `Decimen.Optical.Transfer-v1.0.1-mac-x64.dmg`
 - macOS Apple Silicon: `Decimen.Optical.Transfer-v1.0.1-mac-arm64.dmg`
 
+The Kylin build is a Debian `arm64` package for aarch64 machines and installs
+with `sudo apt install ./Decimen.Optical.Transfer-<version>-kylin-aarch64.deb`.
 The Windows build is a portable EXE. The macOS DMG contains a double-clickable
 `.app`; open the DMG and drag the app to Applications. Unpacked `.app`
 directories are also left beside the DMG after a local build. End users do not
-need Node.js, npm, Python, Electron, or any third-party package. The app serves
+need Node.js, npm, Python, or a separate Electron installation. The app serves
 its bundled pages from `127.0.0.1` and does not need network access during a
 transfer.
 
@@ -75,6 +78,7 @@ Quick platform builds:
 ```bash
 npm run desktop:mac      # macOS Intel + Apple Silicon DMGs and .app folders
 npm run desktop:win      # Windows x64 portable EXE
+npm run desktop:kylin    # Kylin Linux arm64 DEB
 npm run desktop:package  # configured targets for the current platform
 ```
 
@@ -84,14 +88,15 @@ The same builds can be run manually after the web bundle has been built:
 npm run build
 npx electron-builder --config desktop/electron-builder.yml --mac
 npx electron-builder --config desktop/electron-builder.yml --win portable
+npx electron-builder --config desktop/electron-builder.yml --linux deb --arm64
 ```
 
-Use the macOS command on a Mac and the Windows command on Windows for the
-most reliable native builds. All desktop output is written to
-`artifacts/desktop/`, including DMG files, the portable Windows EXE, and
-temporary unpacked application directories. These generated files are ignored
-by Git and must not be committed. DMGs are intended for GitHub Release assets;
-do not commit them to the source repository.
+Use the macOS command on a Mac and the Windows command on Windows for the most
+reliable native builds. The Kylin package can be built on Linux x64 or arm64;
+Electron Builder downloads the arm64 Electron runtime selected by `--arm64`.
+All desktop output is written to `artifacts/desktop/`. These generated files
+are ignored by Git and must not be committed; release packages are attached by
+GitHub Actions instead.
 
 ## Documentation
 
@@ -125,6 +130,7 @@ npm run build:standalone  # both self-contained pages → dist-standalone/
 npm run build:all         # everything
 npm run desktop:mac       # macOS x64 + arm64 DMGs and .app directories
 npm run desktop:win       # Windows x64 portable EXE
+npm run desktop:kylin     # Kylin Linux arm64 DEB
 npm run desktop:package   # configured targets for the current platform
 ```
 

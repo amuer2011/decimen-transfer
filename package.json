@@ -1,10 +1,13 @@
 {
   "name": "decimen-optical-transfer",
   "private": true,
-  "version": "1.0.3",
+  "version": "1.0.4",
   "main": "desktop/main.cjs",
   "license": "MIT",
   "description": "Offline file and text transfer using fountain-coded animated QR codes — screen to camera, no network.",
+  "overrides": {
+    "rollup": "4.40.2"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -15,6 +18,7 @@
     "build:all": "npm run build && npm run build:standalone",
     "desktop:dev": "npm run build && electron .",
     "desktop:package": "npm run build && electron-builder --config desktop/electron-builder.yml",
+    "desktop:kylin": "npm run build && electron-builder --config desktop/electron-builder.yml --linux deb --arm64 --publish never",
     "desktop:mac": "npm run build && electron-builder --config desktop/electron-builder.yml --mac --x64 --arm64 --publish never",
     "desktop:win": "npm run build && electron-builder --config desktop/electron-builder.yml --win --x64 --publish never",
     "preview": "vite preview",

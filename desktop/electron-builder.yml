@@ -25,6 +25,11 @@ win:
         - x64
   artifactName: Decimen.Optical.Transfer-v${version}-win-${arch}.${ext}
 linux:
+  category: Utility
+  maintainer: Decimen
+  executableName: decimen-optical-transfer
   target:
-    - AppImage
-  artifactName: Decimen.Optical.Transfer-v${version}-linux-${arch}.${ext}
+    - target: deb
+      arch:
+        - arm64
+  artifactName: Decimen.Optical.Transfer-${version}-kylin-aarch64.${ext}
