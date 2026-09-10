@@ -28,6 +28,11 @@ linux:
   category: Utility
   maintainer: Decimen
   executableName: decimen-optical-transfer
+  # Kylin V10's Wayland path crashes Electron 40 before the app code loads.
+  # Launch through XWayland from the desktop entry; DISPLAY is available in
+  # the target UKUI session.
+  executableArgs:
+    - --ozone-platform=x11
   target:
     - target: deb
       arch:
