@@ -94,7 +94,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           # Tag pushes cannot provide inputs.release_tag, so github.ref_name
-          # (for example v1.0.6) is the release tag in that case.
+          # (for example v1.0.7) is the release tag in that case.
           tag_name: ${{ inputs.release_tag || github.ref_name }}
           name: ${{ inputs.release_tag || github.ref_name }}
           files: |
