@@ -1,30 +1,25 @@
-# Troubleshooting
+# 故障排查
 
-## "Nothing happening?"
+## 没有识别到二维码
 
-If the camera or screen capture runs for a while without decoding a single frame, a small toast appears above the preview asking exactly that. **Help** opens source-specific tips; **Dismiss** snoozes it (it returns later if things are still dead — tapping a button doesn't make frames arrive).
+- 确认发送端已点击“开始传输”，双方没有暂停。
+- 确认采集到发送窗口，二维码完整且未被其他窗口遮挡。
+- 不要最小化远程桌面或虚拟机；部分系统会停止更新被遮挡的窗口。
+- 在发送端终止传输后降低帧率、每帧字节数，再重新开始；接收端也重新选择窗口。
+- Win7/Aero、虚拟显示驱动和远程桌面环境的采集行为可能不同，请在目标机验收。
 
-The fixes are on the **sender**, which is the non-obvious part. In order:
+## 无法选择窗口
 
-1. On the sender, open Transfer settings and drop **bytes / frame to 1465**. The 2953-byte default is tuned for close-range phone-to-phone and is exactly what fails on an ordinary monitor at arm's length.
-2. Still nothing? Drop the sender's **tx fps to 24**.
-3. Fill this camera's view with the code, and prop the phone against something — autofocus hunting from hand tremor is the usual culprit.
-4. Turn the sending screen's brightness all the way up.
+网页版通过 HTTPS 或 localhost 打开；系统可能要求屏幕共享权限。取消选择不会启动接收，重新点击即可。macOS 需要允许当前应用录制屏幕，授权后可能需要退出重开。
 
-For **Screen/window** input:
+## 进度停止
 
-- Choose the window or tab that visibly contains the animated QR code.
-- Keep it open, visible, and at full brightness; do not choose the Receive page itself.
-- If the preview is black or stops changing, the operating system or remote-desktop client may block capture of a protected or minimized window. Share the whole display or an ordinary browser tab as a fallback.
-- In the packaged macOS app, allow **Screen Recording** for Decimen in **System Settings → Privacy & Security**. If Decimen is missing because its old entry was removed, click **+** and add the currently opened `Decimen Optical Transfer.app`; then quit with **Cmd-Q** and reopen it. In the desktop picker, scroll through the thumbnails, select the RDP/VM source, confirm its preview, and keep that window visible.
+若发送端已重启会话，终止当前接收后重新开始。暂停保留的是原会话，不能续接已更换的文件。解码器加载失败时页面会显示错误并释放采集，不会假装继续接收。
 
-## Input problems
+## 文件校验失败
 
-- **Permission denied** — tap the browser's permission prompt carefully; if you hit Block by accident, allow camera for the site and tap **Start camera** again (no reload needed).
-- **Screen sharing cancelled or denied** — choose **Screen/window**, tap **Capture screen**, and select the VM or remote-desktop source again. In the desktop app, also check the operating system screen-recording permission.
-- **"camera needs a secure context"** — the page is being served over plain http. Browsers remove the camera API on insecure origins; serve over https (the dev server already does, self-signed) or use [decimen.app](https://decimen.app/).
-- **Standalone receiver file** — opening `decimen-receiver.html` from `file://` will not get a camera on iOS or Android. See [Install & offline](install-and-offline.md).
+校验失败的内容不提供保存。重新发送、接收，降低传输速度并确保采集画面稳定。
 
-## Slow transfers
+## Win7 无法启动
 
-See the tuning table in [Sending](sending.md) — bytes/frame and tx fps are the two levers that matter.
+使用文件名含 `win7-x64` 的专用程序，系统必须是 Windows 7 SP1 x64。若系统提示缺少 DLL 或运行库，按具体错误补齐系统更新/运行库。普通 Windows 包使用 Electron 40，不能在 Win7 上运行。

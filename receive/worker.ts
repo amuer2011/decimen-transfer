@@ -32,5 +32,8 @@ ctx.onmessage = async (e: MessageEvent) => {
 
 // warm the WASM so the first real frame doesn't pay instantiation
 void readBarcodes(new ImageData(8, 8), { formats: ["QRCode"] })
-  .catch(() => undefined)
-  .then(() => ctx.postMessage({ id: -1, bytes: null }));
+  .then(() => ctx.postMessage({ id: -1, bytes: null }))
+  .catch((error: unknown) => ctx.postMessage({
+    id: -1, bytes: null,
+    error: error instanceof Error ? error.message : String(error),
+  }));

@@ -1,0 +1,33 @@
+# Windows 7 SP1 x64 build. Do not use this config for the regular Windows
+# release: Electron 22 is pinned here because it is the last Electron line
+# (Chromium 108) that starts on Windows 7/8/8.1. Electron 23 and newer require
+# Windows 10 or newer, so raising electronVersion silently breaks this build.
+#
+# extends is resolved by electron-builder relative to the project root (where
+# package.json lives), NOT relative to this file, so the path below must stay
+# project-root-relative: "desktop/electron-builder.yml".
+extends: desktop/electron-builder.yml
+
+# Separate identity so a Win7 install and the regular Windows build never share
+# taskbar grouping, shortcuts, or per-app identity.
+appId: com.decimen.opticaltransfer.win7
+productName: Decimen Optical Transfer Win7
+extraMetadata:
+  name: decimen-optical-transfer-win7
+
+# Last Electron release with Chromium 108; EOL 2023-10-10, no further security
+# fixes. Keep this exact pin for the Win7 channel.
+electronVersion: 22.3.27
+
+directories:
+  # Dedicated output tree, so this build cannot overwrite (or be overwritten by)
+  # the regular Windows portable EXE in artifacts/desktop.
+  output: artifacts/desktop/win7
+
+win:
+  # Only the same portable x64 target as the base config is built.
+  target:
+    - target: portable
+      arch:
+        - x64
+  artifactName: Decimen.Optical.Transfer-v${version}-win7-x64.${ext}

@@ -1,16 +1,9 @@
-# Privacy
+# 隐私
 
-**Nothing is transmitted anywhere except as light.** There is no account, no pairing, no analytics, and no network path between the devices — the site works with the network off after the first visit.
+传输内容通过屏幕中的二维码传播，不上传到云端，不需要设备间网络路径。二维码内容未加密，能读取发送画面的其他接收方也能获取文件或文本。
 
-**The channel is not confidential.** Whatever is on the sending screen is readable by *any* camera pointed at it. The property Decimen gives you is *no network*, not encryption. Don't stream secrets in a room you don't trust.
+接收只采集用户选择的屏幕或窗口，不读取摄像头、不采集音频、不录制视频。画面帧在内存中用于二维码解码，结束或终止接收后释放共享。
 
-**Integrity is checked.** Every received file is verified against its SHA-256 before being offered; a corrupted stream fails loudly rather than handing over damaged bytes.
+暂停接收保留当前数据与共享窗口；若需要彻底停止共享，请点击“终止接收”或系统共享指示器的停止按钮。
 
-**Screen capture is explicit.** The receiver asks the browser or desktop app to let you choose a display, window, or tab. Screen input is decoded from in-memory frames on the host and is not uploaded or recorded. Do not select a window containing information you do not want transferred through the optical link.
-
-## What persists on the receiving device
-
-- **Text snippets: nothing.** Shown with a Copy button, gone when the tab closes.
-- **Files you save** go wherever your browser puts downloads.
-- **Received media** (video/audio, so the in-page player can seek) is staged in the browser's Cache API and would otherwise linger until the next transfer overwrites it. The **Clear Decimen cache** button next to *Receive another file* deletes it on the spot — use it before handing the phone to someone.
-- The service worker's offline cache holds the **app itself**, never transferred content.
+文件由用户主动保存。为播放媒体，网页版可能在本地 `received-media` 缓存中暂存最后接收的媒体；结果区可清除此缓存。主题偏好会持久化，但不包含传输内容。

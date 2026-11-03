@@ -19,6 +19,7 @@ mac:
         - arm64
   artifactName: Decimen.Optical.Transfer-v${version}-mac-${arch}.${ext}
 win:
+  icon: public/icon.ico
   target:
     - target: portable
       arch:

@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'" />
-    <title>Capture screen</title>
+    <title>选择接收窗口</title>
     <link rel="stylesheet" href="./picker.css" />
   </head>
   <body>
@@ -12,38 +12,38 @@
       <section class="picker-page" id="source-page" aria-labelledby="source-title">
         <header class="picker-header">
           <div>
-            <p class="eyebrow">Desktop input</p>
-            <h1 id="source-title">Choose a screen or window</h1>
-            <p class="subhead">Select the VM or remote-desktop window showing the changing QR code.</p>
+            <p class="eyebrow">SCREEN / WINDOW</p>
+            <h1 id="source-title">选择屏幕或窗口</h1>
+            <p class="subhead">选择正在显示动态二维码的远程桌面或虚拟机窗口。</p>
           </div>
-          <button class="quiet-button" id="cancel-top" type="button">Cancel</button>
+          <button class="quiet-button" id="cancel-top" type="button">取消</button>
         </header>
         <div class="source-groups" id="source-groups" aria-live="polite">
-          <div class="loading-state">Loading available screens and windows...</div>
+          <div class="loading-state">正在加载可用窗口…</div>
         </div>
       </section>
 
       <section class="picker-page preview-page" id="preview-page" aria-labelledby="preview-title" hidden>
         <header class="picker-header">
           <div>
-            <p class="eyebrow">Source preview</p>
-            <h1 id="preview-title">Check this source</h1>
-            <p class="subhead">Make sure the animated QR code is visible before starting the live read.</p>
+            <p class="eyebrow">PREVIEW</p>
+            <h1 id="preview-title">确认采集画面</h1>
+            <p class="subhead">请确认二维码完整可见，再开始接收。</p>
           </div>
-          <button class="quiet-button" id="back-button" type="button">Back to sources</button>
+          <button class="quiet-button" id="back-button" type="button">返回选择</button>
         </header>
         <div class="preview-layout">
           <div class="preview-frame" id="preview-frame">
-            <div class="empty-preview">No preview available</div>
+            <div class="empty-preview">暂无预览</div>
           </div>
           <aside class="preview-details">
             <div class="source-mark" id="preview-mark" aria-hidden="true"></div>
-            <p class="preview-kind" id="preview-kind">Window</p>
-            <h2 id="preview-name">Selected source</h2>
-            <p class="preview-note">The receiver will read changing frames directly from this source in memory. It will not create PNG files or record a video.</p>
+            <p class="preview-kind" id="preview-kind">窗口</p>
+            <h2 id="preview-name">已选窗口</h2>
+            <p class="preview-note">仅分析所选画面中的二维码，不保存截图，不录制视频。</p>
             <div class="preview-actions">
-              <button class="primary-button" id="use-button" type="button">Start live read</button>
-              <button class="quiet-button" id="cancel-preview" type="button">Cancel</button>
+              <button class="primary-button" id="use-button" type="button">开始接收</button>
+              <button class="quiet-button" id="cancel-preview" type="button">取消</button>
             </div>
           </aside>
         </div>

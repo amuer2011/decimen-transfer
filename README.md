@@ -1,162 +1,61 @@
-# Decimen Optical Transfer: fountain-coded QR file transfer
+# Decimen Optical Transfer
 
-Send a file between two devices using nothing but a **screen and a camera**.
-One page displays the file as an endless stream of animated QR codes; another
-device points its camera at it and reconstructs the file. **No network path
-between the devices, no app, no pairing, no permissions beyond the camera.**
-The payload travels as light.
+通过动态二维码传输文件和文本，从屏幕或窗口接收。适用于远程桌面、虚拟机等场景，传输不依赖设备间的网络连接。
 
-## Try it
+## 使用
 
-### **→ [decimen.app](https://decimen.app/)**
+1. 在发送端选择文件（最大 64 MB）或准备文本（最大 4 MB），点击“开始传输”。
+2. 在接收端点击“选择接收窗口”，选择含二维码的远程桌面或虚拟机窗口。
+3. 接收完成并通过 SHA-256 校验后，保存文件或复制文本。
+4. 在发送端手动终止。光学传输没有回传通道，发送端不能自动得知接收完成。
 
-Open it on both devices and go — nothing to install. Works offline after the
-first visit, and installs as an app on both iOS and Android if you want it on
-a home screen.
+摄像头功能已移除，仅支持屏幕/窗口接收。请保持发送窗口可见且持续更新，不要最小化。
 
-Files up to 64 MB (or a pasted text snippet), filename and media type preserved,
-gzip only when it helps, SHA-256 verified before anything is offered — and
-received video plays right in the page. Extracted from a larger experiment that
-reached **128 KB/s phone-to-phone**.
+- 发送：选择内容 → 准备就绪 → 开始 → 暂停 / 继续 → 终止。
+- 接收：选择窗口 → 收集与恢复 → 暂停 / 继续 → 校验 → 保存。
+- 暂停保留同一会话与接收进度；终止接收会释放共享、解码线程并清除进度。
+- 传输中不能更换内容或编码设置，避免无意重置接收进度。退出页面前会提示确认。
+- 黑色、白色主题均可手动选择。桌面版记住选择，窗口选择器跟随主题。
+- 内容未加密，所有能读取发送画面的接收方都能获取内容。
 
-The receiver can also capture a display, window, or browser tab directly. This
-lets a host read an animated QR stream shown inside a virtual machine or remote
-desktop without using a camera, creating a PNG, or recording a video.
+## 构建
 
-<p align="center">
-  <img src="docs/receiving.jpg" width="420"
-       alt="Phone receiving a file over light: 130.5 KB/s goodput, halfway through decoding the sender's animated QR stream" />
-</p>
-<p align="center"><em>Mid-transfer: a phone pulling a file out of the air at 130 KB/s.</em></p>
+构建机使用现代 Windows/macOS/Linux 与 Node.js 22 或更新版本。最终用户无需 Node.js。
 
-Neither mode is encrypted: whatever is on the sending screen is readable by
-any camera pointed at it. The property this gives you is no network, not
-confidentiality — see [privacy](docs/user/privacy.md).
-
-## Desktop packages
-
-Portable desktop builds are produced in `artifacts/desktop/`:
-
-- Kylin Linux arm64: `Decimen.Optical.Transfer-<version>-kylin-aarch64.deb`
-- Windows x64: `Decimen.Optical.Transfer-v1.0.1-win-x64.exe`
-- macOS Intel: `Decimen.Optical.Transfer-v1.0.1-mac-x64.dmg`
-- macOS Apple Silicon: `Decimen.Optical.Transfer-v1.0.1-mac-arm64.dmg`
-
-The Kylin build is a Debian `arm64` package for aarch64 machines and installs
-with `sudo apt install ./Decimen.Optical.Transfer-<version>-kylin-aarch64.deb`.
-The Windows build is a portable EXE. The macOS DMG contains a double-clickable
-`.app`; open the DMG and drag the app to Applications. Unpacked `.app`
-directories are also left beside the DMG after a local build. End users do not
-need Node.js, npm, Python, or a separate Electron installation. The app serves
-its bundled pages from `127.0.0.1` and does not need network access during a
-transfer.
-
-For live remote-desktop or VM QR capture, run the sender in the cloud desktop,
-open **Receive** in the host desktop app, choose **Screen/window**, and select
-the RDP/VM window that shows the changing QR codes. The recovered file is then
-saved through the host app's **Save** action.
-
-The desktop receiver protects its own window from whole-display capture and
-filters it out of the window list, preventing a capture feedback loop.
-
-### Build desktop packages
-
-Run these commands from the repository root. The build machine needs Node.js
-and npm. The first `npm ci` installs the development dependencies, and the
-first desktop build may download the Electron runtime. The packaged apps do
-not need Node.js, npm, or an Internet connection on the end user's machine.
-
-```bash
-cd /path/to/decimen-transfer
+```sh
 npm ci
 npm test
 npm run build
+npm run build:standalone
 ```
 
-Quick platform builds:
-
-```bash
-npm run desktop:mac      # macOS Intel + Apple Silicon DMGs and .app folders
-npm run desktop:win      # Windows x64 portable EXE
-npm run desktop:kylin    # Kylin Linux arm64 DEB
-npm run desktop:package  # configured targets for the current platform
+```sh
+npm run desktop:win      # 常规 Windows x64，Electron 40
+npm run desktop:win7     # Win7 SP1 x64，Electron 22.3.27，独立构建
+npm run desktop:mac      # macOS Intel + Apple Silicon
+npm run desktop:kylin    # Kylin Linux arm64
 ```
 
-The same builds can be run manually after the web bundle has been built:
+常规桌面产物在 `artifacts/desktop/`。Win7 产物为：
 
-```bash
-npm run build
-npx electron-builder --config desktop/electron-builder.yml --mac
-npx electron-builder --config desktop/electron-builder.yml --win portable
-npx electron-builder --config desktop/electron-builder.yml --linux deb --arm64
+```text
+artifacts/desktop/win7/Decimen.Optical.Transfer-v<version>-win7-x64.exe
 ```
 
-Use the macOS command on a Mac and the Windows command on Windows for the most
-reliable native builds. The Kylin package can be built on Linux x64 or arm64;
-Electron Builder downloads the arm64 Electron runtime selected by `--arm64`.
-All desktop output is written to `artifacts/desktop/`. These generated files
-are ignored by Git and must not be committed; release packages are attached by
-GitHub Actions instead.
+Win7 工作流为 **Win7 Desktop**（`.github/workflows/win7-desktop.yml`），可单独手动构建；推送 `v*` tag 时构建并附加到 Release。手动运行不填写 `release_tag` 仅生成工作流下载产物。首次使用该工作流，需要先将代码推送到 GitHub。
 
-## Documentation
+Win7 目标为 **6.1.7601 SP1 x64**。Electron 22 已停止维护；目标系统的启动、显卡和窗口采集能力仍需实机验收。[Win7 构建与验证说明](docs/technical/windows7.md)。
 
-**Using it** — [quick start](docs/user/quick-start.md) ·
-[sending](docs/user/sending.md) · [receiving](docs/user/receiving.md) ·
-[troubleshooting](docs/user/troubleshooting.md) ·
-[install & offline](docs/user/install-and-offline.md) ·
-[privacy](docs/user/privacy.md)
+网页版用 `npm run dev` 启动 HTTPS 开发服务，或通过 HTTPS / localhost 部署 `dist/`。桌面版自动在 `127.0.0.1` 提供打包页面，不需要互联网。
 
-**How it's built** — [architecture](docs/technical/architecture.md) ·
-[protocol](docs/technical/protocol.md) ·
-[platform quirks](docs/technical/platform-quirks.md) ·
-[build & release](docs/technical/build-and-release.md)
+## 文档
 
-The short version of the protocol: a screen-to-camera link has no
-back-channel, so the sender streams fountain-coded frames ([Luby
-transform](https://en.wikipedia.org/wiki/Luby_transform_code)) — the receiver
-collects *any* ~K·1.15 distinct frames in any order and peels the file out.
-Dropped frames cost time, never correctness.
-
-## Run it yourself
-
-```bash
-npm install
-npm run dev               # https dev server with HMR
-npm run serve             # build, then serve the production bundle
-npm run demo              # demo mode: only the bundled payloads can be sent
-npm test                  # golden wire-format vectors and unit tests
-npm run build             # the hosted site → dist/
-npm run build:standalone  # both self-contained pages → dist-standalone/
-npm run build:all         # everything
-npm run desktop:mac       # macOS x64 + arm64 DMGs and .app directories
-npm run desktop:win       # Windows x64 portable EXE
-npm run desktop:kylin     # Kylin Linux arm64 DEB
-npm run desktop:package   # configured targets for the current platform
-```
-
-Open `https://localhost:5173/send/` on the sending device and the printed
-`Network` URL on the receiving phone (accept the self-signed certificate
-once). Walkthrough: [quick start](docs/user/quick-start.md).
-
-## Similar projects
-
-The concept here was arrived at independently. It turns out several people
-have had similar ideas, and their takes are all worth a look:
-
-- [mohankumarelec/airgapped-qr-code-transfer](https://github.com/mohankumarelec/airgapped-qr-code-transfer):
-  browser-based QR file transfer with compression and sequential chunking.
-  Discovered after publicly demoing this project; convergent evolution in
-  action.
-- [divan/txqr](https://github.com/divan/txqr) (2018): animated QR plus
-  fountain codes in Go, with two excellent write-ups on why fountain coding
-  beats sequential looping.
-- [sz3/libcimbar](https://github.com/sz3/libcimbar): goes past QR entirely
-  with a custom high-density color code purpose-built for this channel.
-
-Built by [Evan Crawley (Bash Alarmist)](https://www.linkedin.com/in/evan-crawley), with
-[node-qrcode](https://github.com/soldair/node-qrcode) and
-[zxing-wasm](https://github.com/Sec-ant/zxing-wasm).
+- [快速开始](docs/user/quick-start.md)
+- [发送](docs/user/sending.md) · [接收](docs/user/receiving.md)
+- [故障排查](docs/user/troubleshooting.md) · [离线使用](docs/user/install-and-offline.md)
+- [隐私](docs/user/privacy.md)
+- [协议](docs/technical/protocol.md) · [构建与发布](docs/technical/build-and-release.md)
 
 ## License
 
-MIT
+MIT. Original project by [Evan Crawley (Bash Alarmist)](https://www.linkedin.com/in/evan-crawley), using [node-qrcode](https://github.com/soldair/node-qrcode) and [zxing-wasm](https://github.com/Sec-ant/zxing-wasm).

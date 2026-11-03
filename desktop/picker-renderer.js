@@ -33,7 +33,7 @@ function sourceThumbnail(source, className = "source-thumbnail") {
   }
   const empty = document.createElement("div");
   empty.className = `${className} thumbnail-empty`;
-  empty.textContent = "No preview";
+    empty.textContent = "暂无预览";
   return empty;
 }
 
@@ -43,7 +43,7 @@ function showPreview(source) {
   previewPage.hidden = false;
   previewFrame.replaceChildren(sourceThumbnail(source, "preview-image"));
   previewMark.replaceChildren(sourceIcon(source, "preview-icon"));
-  previewKind.textContent = source.kind;
+  previewKind.textContent = source.kind === "Display" ? "屏幕" : "窗口";
   previewName.textContent = source.name;
   useButton.focus();
 }
@@ -74,7 +74,7 @@ function showSources(sources) {
   } else {
     const empty = document.createElement("div");
     empty.className = "loading-state error-state";
-    empty.textContent = "No screen or window sources are available.";
+    empty.textContent = "暂无可采集的屏幕或窗口。";
     sourceGroups.append(empty);
   }
 }

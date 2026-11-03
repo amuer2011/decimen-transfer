@@ -10,9 +10,10 @@ npm test                  # golden wire-format vectors and unit tests (node --te
 npm run build             # typecheck (app + node configs), hosted site → dist/
 npm run build:standalone  # both self-contained pages → dist-standalone/
 npm run build:all         # everything
-npm run icons             # regenerate public/ icons from the logo (needs librsvg)
+npm run icons             # regenerate all icons and header marks from the SVG
 npm run desktop:mac       # macOS x64 + arm64 DMGs and .app directories
 npm run desktop:win       # Windows x64 portable EXE
+npm run desktop:win7      # Win7 SP1 x64 portable EXE (Electron 22.3.27)
 npm run desktop:kylin     # Kylin Linux arm64 DEB
 npm run desktop:package   # configured targets for the current platform
 ```
@@ -28,9 +29,9 @@ identity. The first launch may require **Open** from the Finder context menu,
 and screen capture may require **System Settings → Privacy & Security → Screen
 Recording**. Windows portable output is x64 and requires no installer.
 
-`npm run icons` strips the logo SVG's comments before rasterizing (a `--` inside a comment is invalid XML that browsers tolerate but librsvg rejects) and does exact-match surgery on the markup, throwing if the logo changes shape.
+`npm run icons` uses the cross-platform resvg dependency to render `public/decimen_logo.svg`. It generates the PWA/Apple PNGs, the multi-size Windows ICO and the three inlined header marks from the same artwork; no system rasterizer is needed.
 
-`VITE_SITE_URL` overrides the published URL baked into social cards and the share dialogs (default `https://decimen.app/`, trailing slash required).
+The frontend build targets Chromium 108 for the independent Win7 runtime. See [Windows 7](windows7.md) for the build, output path and target-machine verification.
 
 ## PWA / service worker
 
@@ -43,6 +44,7 @@ Recording**. Windows portable output is x64 and requires no installer.
 - **`release.yml`** — on a `v*` tag: builds and publishes the hosted site and both standalone files.
 - **`kylin-desktop.yml`** — on pushes to `main` / `release/*`: builds and uploads a Kylin Linux arm64 DEB as a workflow artifact.
 - **`desktop-release.yml`** — on the same `v*` tag: builds the Kylin Linux arm64 DEB, x64 and arm64 macOS DMGs, and x64 portable Windows EXE, then attaches them to the GitHub Release. It also supports manually selecting an existing tag.
+- **`win7-desktop.yml`** — independent Win7 SP1 x64 build. Manual runs upload a workflow artifact; tag pushes or an explicit release tag attach the EXE and SHA-256 checksum to a Release.
 
 Before the first Pages deployment, set **Settings -> Pages -> Build and deployment -> Source** to **GitHub Actions**. The default `GITHUB_TOKEN` can deploy an already-enabled Pages site, but cannot enable Pages for a repository where the site does not exist.
 

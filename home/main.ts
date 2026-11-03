@@ -1,4 +1,2 @@
-// Home page script: the share dialog is all there is to wire.
-import { wireShareDialog } from "../shared/share-dialog";
-
-document.getElementById("share-open")!.addEventListener("click", wireShareDialog());
+// The home page uses ordinary links; shared/theme.ts manages appearance.
+export {};

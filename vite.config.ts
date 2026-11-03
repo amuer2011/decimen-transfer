@@ -106,6 +106,7 @@ export default defineConfig(({ mode }) => {
       // plugin list, so both plugins have to be registered again here.
       worker: { format: "iife", plugins: () => [useInlineVariants(__dirname), inlineZxingWasm()] },
       build: {
+        target: "chrome108",
         outDir,
         emptyOutDir: false,
         assetsInlineLimit: Number.MAX_SAFE_INTEGER,
@@ -179,6 +180,7 @@ export default defineConfig(({ mode }) => {
       licenseBanner(pkg.version),
     ],
     build: {
+      target: "chrome108",
       rollupOptions: {
         input: {
           index: resolve(__dirname, "index.html"),

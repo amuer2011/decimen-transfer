@@ -1,24 +1,12 @@
-# Quick start
+# 快速开始
 
-1. Open [decimen.app](https://decimen.app/) on both devices.
-2. On the sending device (a laptop is ideal): **Send**, pick a file. The QR stream starts immediately. Turn the screen brightness all the way up.
-3. On the receiving device (a phone): **Receive**, tap **Start camera**, point it at the code. Fill the camera view with it and prop the phone against something.
-4. When the bar completes, the file appears with a preview and a **Save** link — after its SHA-256 check passes.
+在远程桌面或虚拟机内打开发送页，在宿主机打开接收页。
 
-To send text instead of a file, flip the sender to **Text snippet** and paste.
-For a live VM or remote-desktop QR stream, run **Send** in the VM/cloud desktop,
-then run **Receive** on the host and choose **Screen/window**. Select the VM or
-RDP window showing the changing QR codes; the host decodes frames directly from
-memory and saves the recovered file locally. This does not create PNG files or
-record a video.
+1. 选择文件，或切换到文本、输入内容后点击“准备文本”。准备完成后点击“开始传输”。
+2. 接收端点击“选择接收窗口”，选择二维码所在窗口。桌面版先选择缩略图，再确认采集画面。
+3. 保持二维码完整可见，等待恢复和 SHA-256 校验完成，再保存文件或复制文本。
+4. 接收完成后手动终止发送。
 
-Nothing decoding? See [Troubleshooting](troubleshooting.md).
+双方均可暂停和继续。暂停只控制本端；接收端暂停时保留进度和共享窗口，终止则清除进度并释放共享。摄像头接收已移除。
 
-## Running it yourself
-
-```bash
-npm install
-npm run dev     # https dev server — accept the self-signed cert warning once
-```
-
-Open `https://localhost:5173/send/` on the sender and the printed `Network` URL (`https://<lan-ip>:5173/receive/`) on the phone. The dev server is https-only because browsers remove the camera API on insecure origins — see [Install & offline](install-and-offline.md) for the details and all the other ways to run it.
+右上角可以切换黑色或白色主题。首次建议使用默认 24 fps / 1465 字节每帧；旧机器可进一步降低帧率。

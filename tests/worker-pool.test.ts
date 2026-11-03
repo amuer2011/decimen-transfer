@@ -138,3 +138,32 @@ test("an empty pool accepts nothing", () => {
   assert.equal(pool.submit(frame(1), []), false);
   assert.equal(pool.busyCount, 0);
 });
+
+test("late replies after pause or stop cannot corrupt the replacement pool", () => {
+  const { pool, created, decoded } = harness();
+  pool.resize(1);
+  pool.submit(frame(1), []);
+  const stale = created[0]!;
+  pool.resize(0);
+  pool.resize(1);
+  pool.submit(frame(2), []);
+  stale.reply(frame(1));
+  assert.equal(pool.busyCount, 1);
+  assert.deepEqual(decoded, []);
+  created[1]!.reply(frame(2));
+  assert.equal(pool.busyCount, 0);
+  assert.deepEqual(decoded, [frame(2)]);
+});
+
+test("WASM warm-up failures are surfaced so a receiver can release its capture", () => {
+  const created: FakeWorker[] = [];
+  const errors: string[] = [];
+  const pool = new DecodeWorkerPool(() => {
+    const worker = new FakeWorker(created.length);
+    created.push(worker);
+    return worker;
+  }, () => assert.fail("must not decode"), error => errors.push(error));
+  pool.resize(1);
+  created[0]!.onmessage?.({data: {id:-1, bytes:null, error:"WASM unsupported"}} as MessageEvent);
+  assert.deepEqual(errors, ["WASM unsupported"]);
+});

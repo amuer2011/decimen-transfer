@@ -4,7 +4,7 @@
   "version": "1.0.6",
   "main": "desktop/main.cjs",
   "license": "MIT",
-  "description": "Offline file and text transfer using fountain-coded animated QR codes — screen to camera, no network.",
+  "description": "Offline file and text transfer using fountain-coded animated QR codes and screen/window capture.",
   "overrides": {
     "rollup": "4.40.2"
   },
@@ -21,11 +21,13 @@
     "desktop:kylin": "npm run build && electron-builder --config desktop/electron-builder.yml --linux deb --arm64 --publish never",
     "desktop:mac": "npm run build && electron-builder --config desktop/electron-builder.yml --mac --x64 --arm64 --publish never",
     "desktop:win": "npm run build && electron-builder --config desktop/electron-builder.yml --win --x64 --publish never",
+    "desktop:win7": "npm run build && electron-builder --config desktop/electron-builder.win7.yml --win --x64 --publish never && node build/verify-win7.cjs",
     "preview": "vite preview",
     "icons": "node --import tsx build/make-icons.ts",
     "test": "node --import tsx --test tests/*.test.ts"
   },
   "devDependencies": {
+    "@resvg/resvg-js": "2.6.2",
     "@types/node": "^26.1.2",
     "@types/qrcode": "^1.5.5",
     "@vitejs/plugin-basic-ssl": "^1.2.0",

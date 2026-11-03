@@ -1,5 +1,9 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
+window.addEventListener("DOMContentLoaded", () => {
+  document.documentElement.dataset.theme = ipcRenderer.sendSync("appearance:get");
+});
+
 contextBridge.exposeInMainWorld("decimenPicker", {
   onSources(callback) {
     ipcRenderer.on("picker:sources", (_event, sources) => callback(sources));

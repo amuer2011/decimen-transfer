@@ -1,0 +1,103 @@
+name: Win7 Desktop
+
+# Independent Win7 SP1 x64 channel. The regular Desktop Release workflow keeps
+# building the Electron 40 package for Windows 10+; this workflow never touches
+# that build or its output directory.
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref to build (branch, tag, or commit SHA). Empty = the branch/tag selected above."
+        required: false
+        type: string
+      release_tag:
+        description: "Existing release tag to attach the Win7 EXE and SHA256SUMS-win7.txt to. Empty = workflow artifact only."
+        required: false
+        type: string
+
+# Read-only by default. Only the publishing job below gets contents: write, and
+# it never checks out or executes code from the selected ref.
+permissions:
+  contents: read
+
+concurrency:
+  group: win7-desktop-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build Win7 SP1 x64 portable EXE
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout selected ref
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test
+        run: npm test
+
+      - name: Build Win7 portable EXE
+        run: npm run desktop:win7
+
+      - name: Upload Win7 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: decimen-win7-sp1-x64
+          path: |
+            artifacts/desktop/win7/*.exe
+            artifacts/desktop/win7/SHA256SUMS-win7.txt
+          if-no-files-found: error
+          compression-level: 0
+
+  publish:
+    name: Attach Win7 build to release
+    needs: build
+    # A v* tag PUSH publishes automatically. A manual run publishes only when a
+    # release tag is explicitly supplied; selecting a tag as the build ref alone
+    # must not publish. Otherwise the build artifact is all that is produced.
+    if: >-
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+      (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download Win7 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: decimen-win7-sp1-x64
+          path: release
+
+      - name: Verify checksum
+        shell: bash
+        run: |
+          cd release
+          sha256sum -c SHA256SUMS-win7.txt
+
+      - name: Publish Win7 assets to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          # Tag pushes cannot provide inputs.release_tag, so github.ref_name
+          # (for example v1.0.6) is the release tag in that case.
+          tag_name: ${{ inputs.release_tag || github.ref_name }}
+          name: ${{ inputs.release_tag || github.ref_name }}
+          files: |
+            release/*.exe
+            release/SHA256SUMS-win7.txt
+          fail_on_unmatched_files: true

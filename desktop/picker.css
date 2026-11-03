@@ -1,15 +1,15 @@
+/* Match the main window's persisted light/dark appearance. */
 :root {
+  color-scheme: light;
+  --ink: #202022; --muted: #77777c; --dim: #929296; --line: #e5e5e3;
+  --panel: #fff; --panel-raised: #f1f1ef; --canvas: #f7f7f5;
+  --cyan: #202022; --cyan-ink: #fff; --amber: #77777c;
+}
+:root[data-theme="dark"] {
   color-scheme: dark;
-  --ink: #f2f5f7;
-  --muted: #9aa7ad;
-  --dim: #68757b;
-  --line: #29343a;
-  --panel: #10171c;
-  --panel-raised: #172127;
-  --canvas: #070a11;
-  --cyan: #6be4dc;
-  --cyan-ink: #062c2d;
-  --amber: #f2bd68;
+  --ink: #f0f0ef; --muted: #a0a0a5; --dim: #77777c; --line: #333336;
+  --panel: #1b1b1e; --panel-raised: #252528; --canvas: #111113;
+  --cyan: #eeeee9; --cyan-ink: #202022; --amber: #a0a0a5;
 }
 
 * {
@@ -100,7 +100,7 @@ h1 {
 .primary-button {
   min-height: 36px;
   border: 1px solid var(--line);
-  border-radius: 5px;
+  border-radius: 9px;
   padding: 0 13px;
   cursor: pointer;
   font-size: 13px;
@@ -115,7 +115,7 @@ h1 {
 
 .quiet-button:hover,
 .quiet-button:focus-visible {
-  border-color: #50616a;
+  border-color: var(--muted);
   color: var(--ink);
   outline: none;
 }
@@ -128,8 +128,8 @@ h1 {
 
 .primary-button:hover,
 .primary-button:focus-visible {
-  background: #a1f2eb;
-  outline: 3px solid rgb(107 228 220 / 18%);
+  background: var(--ink);
+  outline: 2px solid var(--muted);
   outline-offset: 2px;
 }
 
@@ -154,15 +154,15 @@ h1 {
 .source-grid {
   display: grid;
   width: 100%;
-  grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
   align-content: start;
-  gap: 6px;
+  gap: 12px;
 }
 
 .source-tile {
   min-width: 0;
   border: 1px solid var(--line);
-  border-radius: 5px;
+  border-radius: 9px;
   padding: 4px;
   overflow: hidden;
   background: var(--panel);
@@ -185,9 +185,9 @@ h1 {
   display: block;
   width: 100%;
   aspect-ratio: 16 / 9;
-  border: 1px solid #2a373d;
+  border: 1px solid var(--line);
   border-radius: 4px;
-  background: #0c1216;
+  background: var(--canvas);
   object-fit: cover;
 }
 
@@ -238,7 +238,7 @@ h1 {
   position: relative;
   display: inline-grid;
   place-items: center;
-  background: #25343a;
+  background: var(--panel-raised);
   color: var(--cyan);
 }
 
@@ -302,7 +302,7 @@ h1 {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel);
-  box-shadow: 0 18px 45px rgb(0 0 0 / 22%);
+
 }
 
 .preview-image,
@@ -373,3 +373,7 @@ h1 {
   }
 
 }
+
+.picker-page { animation: reveal .2s ease; }
+@keyframes reveal { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }

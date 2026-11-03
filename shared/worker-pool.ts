@@ -17,6 +17,7 @@ export interface PoolWorker {
 interface DecodeMessage {
   id: number;
   bytes: Uint8Array | null;
+  error?: string;
 }
 
 export class DecodeWorkerPool {
@@ -26,6 +27,7 @@ export class DecodeWorkerPool {
   constructor(
     private readonly create: () => PoolWorker,
     private readonly onDecoded: (bytes: Uint8Array) => void,
+    private readonly onFailure: (message: string) => void = () => {},
   ) {}
 
   get size(): number {
@@ -47,7 +49,10 @@ export class DecodeWorkerPool {
       const slot = this.workers.length;
       const worker = this.create();
       worker.onmessage = (event: MessageEvent) => {
-        const { id, bytes } = event.data as DecodeMessage;
+        // A terminated worker must never affect a replacement occupying its slot.
+        if (this.workers[slot] !== worker) return;
+        const { id, bytes, error } = event.data as DecodeMessage;
+        if (error) { this.onFailure(error); return; }
         if (id === -1) return; // warm-up ping, no frame attached
         this.busy[slot] = false;
         if (bytes) this.onDecoded(bytes);

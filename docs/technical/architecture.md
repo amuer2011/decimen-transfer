@@ -6,9 +6,9 @@ Three pages, one shared core, a handful of single-purpose build plugins. No fram
 
 | dir | page | entry |
 |---|---|---|
-| `/` | home: cards, share dialog | `home/main.ts` |
+| `/` | home: send/receive cards, theme switch | `home/main.ts`, `shared/theme.ts` |
 | `send/` | file/snippet → fountain-coded QR stream on a canvas | `send/main.ts` |
-| `receive/` | camera or screen capture → WASM QR decode in workers → fountain decoder → file | `receive/main.ts`, `receive/worker.ts` |
+| `receive/` | screen/window capture → WASM QR decode in workers → fountain decoder → file | `receive/main.ts`, `receive/worker.ts` |
 
 The desktop package wraps the same `dist/` pages in Electron. `desktop/main.cjs`
 serves them only on loopback, handles the native display/window source picker,
@@ -22,14 +22,15 @@ or runtime package manager is involved.
 - `frame-capacity.ts` — QR capacity math: payload size → block length / count limits.
 - `qr-raster.ts` — QR module matrix → RGBA raster.
 - `display.ts` — QR display-size fitting against the viewport.
-- `platform.ts` — `isIOS`/`isAndroid` sniffs and camera capability probing (torch, continuous focus, max fps). Policy: probe wherever probeable; sniff only for unprobeable behavior.
+- `theme.ts` — light/dark appearance, browser storage and desktop preference bridge.
+- `transfer-clock.ts` — active elapsed time excluding pauses for ETA and transfer speed.
+- `confirm.ts` — confirmation for lost progress, unsaved results and leaving an active transfer.
 - `worker-pool.ts` — decode worker pool; busy workers drop frames, the fountain absorbs it.
 - `no-signal.ts` — pure timing policy for the "Nothing happening?" hint (short first delay, longer after dismissal).
 - `progress.ts` — frames-collected progress estimation and fountain-overhead model.
 - `send-settings.ts` — canonical tx settings lists; the sender's dropdowns and the no-signal advice both render from it.
 - `snippet.ts` — text-snippet container type.
 - `dialog.ts` — geometric backdrop-click close for `<dialog>`.
-- `share-dialog.ts` — the share dialog both home and sender carry (QR + copy + OS sheet).
 - `status-line.ts`, `wake-lock.ts`, `format.ts`, `style.css`.
 
 ## Build plugins (`build/`)

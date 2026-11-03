@@ -11,6 +11,10 @@ test("skips content protection on Windows 10 LTSC 2019", () => {
   assert.equal(shouldProtectWindow("win32", "10.0.17763"), false);
 });
 
+test("skips modern window capture protection on Windows 7 SP1 build 7601", () => {
+  assert.equal(shouldProtectWindow("win32", "6.1.7601"), false);
+});
+
 test("enables content protection at Windows 10 build 19041", () => {
   assert.equal(shouldProtectWindow("win32", "10.0.19041"), true);
 });

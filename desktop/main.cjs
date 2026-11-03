@@ -4,6 +4,7 @@ const {
   desktopCapturer,
   dialog,
   ipcMain,
+  nativeTheme,
   session,
   shell,
   systemPreferences,
@@ -30,6 +31,34 @@ let baseUrl;
 let mainWindow;
 let sourcePickerWindow;
 let sourcePickerState;
+let appearance;
+
+function appearancePath() {
+  return path.join(app.getPath("userData"), "appearance.json");
+}
+
+function loadAppearance() {
+  try {
+    const value = JSON.parse(fs.readFileSync(appearancePath(), "utf8")).theme;
+    if (value === "light" || value === "dark") appearance = value;
+  } catch { /* First run, or a preference file that cannot be read. */ }
+  appearance ??= nativeTheme.shouldUseDarkColors ? "dark" : "light";
+  nativeTheme.themeSource = appearance;
+}
+
+ipcMain.on("appearance:get", (event) => {
+  event.returnValue = appearance ?? "light";
+});
+ipcMain.on("appearance:set", (event, theme) => {
+  if (event.sender !== mainWindow?.webContents || (theme !== "light" && theme !== "dark")) return;
+  appearance = theme;
+  nativeTheme.themeSource = theme;
+  mainWindow.setBackgroundColor(theme === "dark" ? "#111113" : "#f7f7f5");
+  try {
+    fs.mkdirSync(app.getPath("userData"), { recursive: true });
+    fs.writeFileSync(appearancePath(), JSON.stringify({ theme }), "utf8");
+  } catch (error) { console.error("Could not save appearance:", error.message); }
+});
 
 const MIME_TYPES = {
   ".css": "text/css; charset=utf-8",
@@ -81,7 +110,7 @@ function showSourcePicker(parentWindow, sources) {
       minHeight: 500,
       title: "Capture screen",
       icon: APP_ICON,
-      backgroundColor: "#070a11",
+      backgroundColor: appearance === "dark" ? "#111113" : "#f7f7f5",
       parent: parentWindow && !parentWindow.isDestroyed() ? parentWindow : undefined,
       modal: Boolean(parentWindow && !parentWindow.isDestroyed()),
       resizable: true,
@@ -327,7 +356,7 @@ async function createWindow() {
     minHeight: 560,
     title: PRODUCT_NAME,
     icon: APP_ICON,
-    backgroundColor: "#070a11",
+    backgroundColor: appearance === "dark" ? "#111113" : "#f7f7f5",
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -336,6 +365,15 @@ async function createWindow() {
     },
   });
   mainWindow = window;
+  window.webContents.on("will-prevent-unload", (event) => {
+    const choice = dialog.showMessageBoxSync(window, {
+      type: "question", title: PRODUCT_NAME,
+      message: "结束当前会话并离开？",
+      detail: "未完成的传输进度和未保存的结果将丢失。",
+      buttons: ["返回", "结束并离开"], defaultId: 0, cancelId: 0,
+    });
+    if (choice === 1) event.preventDefault();
+  });
   window.on("closed", () => {
     if (mainWindow === window) mainWindow = undefined;
   });
@@ -364,6 +402,7 @@ if (!hasSingleInstance) {
   });
 
   app.whenReady().then(() => {
+    loadAppearance();
     configureDownloads();
     configureDisplayCapture();
     return createWindow();

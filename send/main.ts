@@ -1,28 +1,15 @@
-// Sender: turn a file into an endless fountain-coded QR stream.
-//
-// Tuning notes from the experiments this PoC is distilled from:
-// - Frame payload sets the QR version; denser wins on goodput as long as the
-//   receiver can still decode it. 1465 bytes ≈ V27 is a safe middle ground
-//   for arbitrary monitors; 2953 (V40) is the ceiling and works phone-to-
-//   phone at close range.
-// - The mask pattern is pinned (any declared mask is valid to a decoder);
-//   this skips the spec's 8-way mask evaluation and speeds generation ~4×.
-// - Displays need each frame shown for ≥2 refresh cycles or captures catch
-//   the transition; 24 fps on a 60 Hz screen is comfortable.
-// - Error correction stays at L by default: the fountain layer already
-//   handles erasures, and a frame is either decoded whole or discarded.
-
+// Sender: preparation is separate from transmission. Pause keeps the encoder
+// and sequence; stop invalidates every asynchronous task and clears the QR.
 import QRCode from "qrcode";
+import { guardNavigation } from "../shared/confirm";
 import { fitQrDisplaySize } from "../shared/display";
 import { rasterizeQr } from "../shared/qr-raster";
 import { formatBytes } from "../shared/format";
 import {
-  MAX_SOURCE_BLOCKS,
   blockLength,
   fitsInOneStream,
   minimumFrameBytes,
   smallestSufficientFrameSize,
-  sourceBlockCount,
 } from "../shared/frame-capacity";
 import { LTEncoder } from "../shared/fountain";
 import { MAX_SNIPPET_BYTES, MAX_SNIPPET_LABEL, packSnippet } from "../shared/snippet";
@@ -37,336 +24,222 @@ import {
 } from "../shared/protocol";
 import { statusLine } from "../shared/status-line";
 import { requestScreenWakeLock } from "../shared/wake-lock";
-import { wireShareDialog } from "../shared/share-dialog";
 
-const MARGIN = 4; // quiet-zone modules
+
+const MARGIN = 4;
 const LOOKAHEAD = 3;
-
-// `npm run demo` (vite --mode demo). Locks the sender to the two bundled
-// payloads so the app can be left running in front of strangers without
-// handing them a file picker into the host machine.
 const DEMO = import.meta.env.VITE_DEMO === "1";
-
-const canvas = document.getElementById("qr") as HTMLCanvasElement;
-const stage = document.getElementById("stage") as HTMLDivElement;
-const specs = document.getElementById("specs")!;
-const cfgFile = document.getElementById("cfg-file") as HTMLInputElement;
-const filePickerLabel = document.getElementById("file-picker-label")!;
-const filePickerButton = document.getElementById("file-picker-button")!;
-const toolTitle = document.getElementById("tool-title")!;
-const snippetText = document.getElementById("snippet-text") as HTMLTextAreaElement;
-const snippetLabel = document.getElementById("snippet-label")!;
-const sendSnippetBtn = document.getElementById("send-snippet") as HTMLButtonElement;
-const paneFile = document.getElementById("pane-file")!;
-const paneSnippet = document.getElementById("pane-snippet")!;
-const paneDemo = document.getElementById("pane-demo")!;
-const modePicker = document.getElementById("mode-picker")!;
+const el = (id: string) => document.getElementById(id)!;
+const canvas = el("qr") as HTMLCanvasElement;
+const stage = el("stage");
+const specs = el("specs");
+const cfgFile = el("cfg-file") as HTMLInputElement;
+const filePickerLabel = el("file-picker-label");
+const filePickerButton = el("file-picker-button");
+const toolTitle = el("tool-title");
+const snippetText = el("snippet-text") as HTMLTextAreaElement;
+const snippetLabel = el("snippet-label");
+const sendSnippetBtn = el("send-snippet") as HTMLButtonElement;
+const paneFile = el("pane-file");
+const paneSnippet = el("pane-snippet");
+const paneDemo = el("pane-demo");
+const modePicker = el("mode-picker");
 const modeInputs = [...document.querySelectorAll<HTMLInputElement>('input[name="send-mode"]')];
-const streamSpecs = document.getElementById("stream-specs")!;
-const footerHint = document.getElementById("footer-hint")!;
-const spec = (id: string) => document.getElementById(id)!;
+const streamSpecs = el("stream-specs");
+const footerHint = el("footer-hint");
+const startBtn = el("start-send") as HTMLButtonElement;
+const pauseBtn = el("pause-send") as HTMLButtonElement;
+const stopBtn = el("stop-send") as HTMLButtonElement;
+const expandBtn = el("expand-send") as HTMLButtonElement;
+const spec = el;
+const cfgFps = el("cfg-fps") as HTMLSelectElement;
+const cfgBytes = el("cfg-bytes") as HTMLSelectElement;
+const cfgEcc = el("cfg-ecc") as HTMLSelectElement;
+const cfgSize = el("cfg-size") as HTMLInputElement;
 
-/** Panels that only mean something while a stream is up: the spec grid at the
- *  bottom of Transfer settings, and the receiver hint under the status line. */
-function showStreamPanels(visible: boolean): void {
-  streamSpecs.hidden = !visible;
-  footerHint.hidden = !visible;
-}
-
-const openShareDialog = wireShareDialog();
-const cfgFps = document.getElementById("cfg-fps") as HTMLSelectElement;
-const cfgBytes = document.getElementById("cfg-bytes") as HTMLSelectElement;
-const cfgEcc = document.getElementById("cfg-ecc") as HTMLSelectElement;
-const cfgSize = document.getElementById("cfg-size") as HTMLInputElement;
-
-let selectedFile: {
-  name: string;
-  size: number;
-  payload: Uint8Array;
-  compression: "none" | "gzip";
-  transmittedSize: number;
-} | null = null;
-let generation = 0; // bumped on every restart; stale loops see it and die
+let selectedFile: { name: string; size: number; payload: Uint8Array;
+  compression: "none" | "gzip"; transmittedSize: number } | null = null;
+let generation = 0;
+let preparing = false;
+let sending = false;
+let paused = false;
 let resizeDisplay: (() => void) | null = null;
 let fileDragDepth = 0;
-
 const specsLine = statusLine(specs);
 const setStatus = specsLine.setStatus;
-
-/**
- * Errors also hide the stage — a stale QR stream pulsing away under a
- * rejection message reads as "still working".
- *
- * Callers decide whether the pick survives. A file rejected on size is gone;
- * a stream that can't start at the current bytes/frame is not, because turning
- * that setting back up is the fix.
- */
+type SendMode = "file" | "snippet";
+function currentMode(): SendMode {
+  return modeInputs.find(input => input.checked)?.value === "snippet" ? "snippet" : "file";
+}
+function showStreamPanels(visible: boolean): void { streamSpecs.hidden = !visible; }
+function updateFilePicker(): void {
+  filePickerButton.textContent = selectedFile ? "更换文件" : "选择文件";
+  filePickerLabel.textContent = selectedFile ? `${selectedFile.name} · ${formatBytes(selectedFile.size)}` : `或拖放到这里 · 最大 ${MAX_FILE_LABEL}`;
+}
+function updateControls(): void {
+  const locked = sending || preparing;
+  cfgFile.disabled = locked;
+  snippetText.disabled = locked;
+  sendSnippetBtn.disabled = locked || !snippetText.value.trim();
+  for (const input of modeInputs) input.disabled = locked;
+  for (const input of [cfgFps, cfgBytes, cfgEcc]) input.disabled = locked;
+  for (const button of document.querySelectorAll<HTMLButtonElement>('[data-demo]')) button.disabled = locked;
+  paneFile.classList.toggle("is-locked", locked);
+  startBtn.hidden = sending;
+  startBtn.disabled = !selectedFile || preparing;
+  pauseBtn.hidden = !sending;
+  pauseBtn.textContent = paused ? "继续传输" : "暂停";
+  pauseBtn.setAttribute("aria-pressed", String(paused));
+  stopBtn.disabled = !locked && !selectedFile;
+  stopBtn.textContent = preparing ? "取消准备" : sending ? "终止" : "清除";
+  expandBtn.disabled = !sending;
+  el("send-empty").hidden = sending;
+  el("send-empty").querySelector("h2")!.textContent = preparing ? "正在准备内容" : selectedFile ? "内容已就绪" : "等待你的内容";
+  el("send-paused").hidden = !paused;
+  canvas.style.visibility = paused ? "hidden" : "visible";
+  el("send-state").textContent = preparing ? "准备中" : paused ? "已暂停" : sending ? "发送中" : selectedFile ? "已就绪" : "待就绪";
+  el("send-state").dataset.active = String(sending && !paused);
+  updateFilePicker();
+}
 function showError(message: string): void {
+  generation++;
+  preparing = false; sending = false; paused = false;
   setStageFullscreen(false);
   stage.hidden = true;
   showStreamPanels(false);
+  updateControls();
   specsLine.showError(message);
 }
-
-type SendMode = "file" | "snippet";
-
-function currentMode(): SendMode {
-  const value = modeInputs.find((input) => input.checked)?.value;
-  return value === "snippet" ? "snippet" : "file";
-}
-
-/** The picker reads as state — which file is armed — and the button offers
- *  the next action: pick when idle, stop when streaming. A rejected pick
- *  keeps the idle wording: the status line already names what went wrong,
- *  and nothing is streaming. */
-function updateFilePicker(): void {
-  const armed = currentMode() === "file" && selectedFile !== null;
-  paneFile.classList.toggle("has-file", armed);
-  filePickerButton.textContent = armed ? "Stop transfer" : "Select File";
-  filePickerLabel.textContent =
-    armed && selectedFile
-      ? `Selected file: ${selectedFile.name}`
-      : `Any file · up to ${MAX_FILE_LABEL} · drop here`;
-}
-
-function idlePrompt(mode: SendMode): string {
-  if (mode === "snippet") return "Paste or type some text to begin";
-  return "Choose a file to begin";
-}
-
-/** Tear the stream down and disarm the picker. The input is cleared so the
- *  same file can be picked again (change would not fire otherwise) and so a
- *  mode switch does not silently resurrect the stopped stream. */
 function stopTransfer(): void {
   generation++;
+  preparing = false; sending = false; paused = false;
   selectedFile = null;
+  resizeDisplay = null;
   setStageFullscreen(false);
   stage.hidden = true;
+  canvas.getContext("2d")!.clearRect(0, 0, canvas.width, canvas.height);
   showStreamPanels(false);
   cfgFile.value = "";
-  updateFilePicker();
-  setStatus(idlePrompt(currentMode()));
+  footerHint.textContent = "二维码仅在开始传输后显示";
+  updateControls();
+  setStatus("已清除传输。可以选择新的内容。");
 }
-
-/** Tap the code to fill the screen with it — a bigger physical code lets the
- *  receiver sit farther back or decode denser frames.
- *
- *  Fullscreen is a page STATE (body.qr-full — see style.css), never a fixed
- *  overlay and never a separate element: Safari 26 latches its chrome tint
- *  onto fixed layers, and an overlay element that merely loses a class is
- *  still there for the heuristic to track. A flow layout that reflows on
- *  exit leaves nothing behind. Tap again (or Esc) to shrink back. */
-let scrollBeforeFullscreen = 0;
 function setStageFullscreen(on: boolean): void {
-  if (on === document.body.classList.contains("qr-full")) return;
-  if (on) scrollBeforeFullscreen = window.scrollY;
   document.body.classList.toggle("qr-full", on);
+  expandBtn.textContent = on ? "退出放大 · Esc" : "放大预览 ⛶";
   resizeDisplay?.();
-  // Entering: the stage IS the page now, start at its top. Leaving: put the
-  // user back on the exact spot they expanded from.
-  window.scrollTo(0, on ? 0 : scrollBeforeFullscreen);
 }
-
-stage.addEventListener("click", () => {
-  setStageFullscreen(!document.body.classList.contains("qr-full"));
-});
-window.addEventListener("keydown", (event) => {
-  if (event.key === "Escape") setStageFullscreen(false);
-});
-
-/** Switching what we're sending kills any stream in flight and clears the stage. */
 function applyMode(): void {
-  generation++;
-  selectedFile = null;
-  setStageFullscreen(false);
+  stopTransfer();
+  modePicker.hidden = DEMO;
+  paneFile.hidden = DEMO || currentMode() !== "file";
+  paneSnippet.hidden = DEMO || currentMode() !== "snippet";
+  paneDemo.hidden = !DEMO;
+  toolTitle.textContent = currentMode() === "snippet" ? "发送文本" : "发送文件";
+  setStatus(currentMode() === "snippet" ? "输入文本后点击「准备文本」" : "选择文件或拖放到上方区域");
+}
+async function startSelection(status: string, prepare: () => Promise<{name: string; size: number; packed: PackedOpticalFile}>): Promise<void> {
+  if (sending || preparing) return;
+  const gen = ++generation;
+  selectedFile = null; preparing = true;
   stage.hidden = true;
   showStreamPanels(false);
-
-  if (DEMO) {
-    modePicker.hidden = true;
-    paneFile.hidden = true;
-    paneSnippet.hidden = true;
-    paneDemo.hidden = false;
-    setStatus("Choose a demo payload to begin");
-    return;
-  }
-
-  const mode = currentMode();
-  paneDemo.hidden = true;
-  paneFile.hidden = mode !== "file";
-  paneSnippet.hidden = mode !== "snippet";
-  toolTitle.textContent = mode === "snippet" ? "Send text" : "Send a file";
-  setStatus(idlePrompt(mode));
-  updateFilePicker();
-  // A file left in the picker survives the switch, so re-arm it rather than
-  // leaving a filename on screen next to "choose a file to begin".
-  if (mode === "file" && cfgFile.files?.[0]) void selectFile();
-}
-
-/**
- * The one path from "user picked something" to a running stream.
- *
- * Kills any stream in flight, then packs the payload; a selection that lands
- * mid-pack (the generation guard) or fails to pack (throw → showError) leaves
- * the page idle rather than streaming something stale. Every way of choosing a
- * payload goes through here so the guard can't be subtly wrong in one copy.
- */
-async function startSelection(
-  status: string,
-  prepare: () => Promise<{ name: string; size: number; packed: PackedOpticalFile }>,
-): Promise<void> {
-  const selectionGeneration = ++generation;
-  selectedFile = null;
-  stage.hidden = true;
+  updateControls();
   setStatus(status);
   try {
-    const { name, size, packed } = await prepare();
-    if (selectionGeneration !== generation) return;
-    selectedFile = {
-      name,
-      size,
-      payload: packed.container,
-      compression: packed.compression,
-      transmittedSize: packed.transmittedSize,
-    };
-    await startStream(true);
+    const {name, size, packed} = await prepare();
+    if (gen !== generation) return;
+    selectedFile = {name, size, payload: packed.container, compression: packed.compression, transmittedSize: packed.transmittedSize};
+    preparing = false;
+    setStatus(`已准备 ${name} · ${formatBytes(size)}，点击「开始传输」。`);
+    updateControls();
   } catch (error) {
-    showError(error instanceof Error ? error.message : String(error));
+    if (gen === generation) showError(error instanceof Error ? error.message : String(error));
   }
 }
-
-/** Demo payloads ship in public/, so they sit at the site root beside /send/. */
-async function selectDemo(fileName: string): Promise<void> {
-  await startSelection(`loading ${fileName}…`, async () => {
-    const response = await fetch(`../${fileName}`);
-    if (!response.ok) throw new Error(`could not load ${fileName} (${response.status})`);
-    const bytes = new Uint8Array(await response.arrayBuffer());
-    return { name: fileName, size: bytes.length, packed: await packFile(fileName, "image/png", bytes) };
-  });
-}
-
-async function selectFile(fileOverride?: File): Promise<void> {
-  const file = fileOverride ?? cfgFile.files?.[0];
+async function selectFile(file?: File): Promise<void> {
+  file ??= cfgFile.files?.[0];
   if (!file) return;
-  await startSelection(`preparing ${file.name}…`, async () => {
-    // Checked here, off File.size, rather than after reading the bytes: a file
-    // well past the limit should be refused instantly instead of after the
-    // browser has spent time and memory materialising it. Name the actual size —
-    // "too large" without a number leaves you guessing by how much.
-    if (file.size === 0) {
-      throw new Error(`${file.name} is empty — there is nothing to send.`);
-    }
-    if (file.size > MAX_FILE_BYTES) {
-      throw new Error(`${file.name} is ${formatBytes(file.size)}, over the ${MAX_FILE_LABEL} limit.`);
-    }
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    return { name: file.name, size: file.size, packed: await packFile(file.name, file.type, bytes) };
+  const chosen = file;
+  cfgFile.value = "";
+  await startSelection(`正在准备 ${chosen.name}…`, async () => {
+    if (!chosen.size) throw new Error("文件为空，请选择有内容的文件。");
+    if (chosen.size > MAX_FILE_BYTES) throw new Error(`文件超过 ${MAX_FILE_LABEL} 限制。`);
+    const bytes = new Uint8Array(await chosen.arrayBuffer());
+    return {name: chosen.name, size: chosen.size, packed: await packFile(chosen.name, chosen.type, bytes)};
   });
-  updateFilePicker();
 }
-
-function isFileDrag(event: DragEvent): boolean {
-  return Array.from(event.dataTransfer?.types ?? []).includes("Files");
-}
-
-function setFileDragState(active: boolean): void {
-  paneFile.classList.toggle("is-dragover", active);
-  if (!active) {
-    updateFilePicker();
-    return;
-  }
-  const replacing = currentMode() === "file" && selectedFile !== null;
-  filePickerButton.textContent = replacing ? "Drop to replace" : "Drop file";
-  filePickerLabel.textContent = "Release to parse the file";
-}
-
 async function selectSnippet(): Promise<void> {
-  await startSelection("preparing text snippet…", async () => {
+  await startSelection("正在准备文本…", async () => {
     const packed = await packSnippet(snippetText.value);
-    return { name: "Text snippet", size: packed.originalSize, packed };
+    return {name: "文本片段", size: packed.originalSize, packed};
   });
 }
-
-async function main() {
-  // Both bounds come from MAX_SNIPPET_BYTES so they can't drift apart. maxLength
-  // counts UTF-16 units and the real check counts UTF-8 bytes, which are never
-  // fewer — so this is a loose guard and packSnippet() remains authoritative.
-  snippetText.maxLength = MAX_SNIPPET_BYTES;
-  snippetLabel.textContent = `Text to send · up to ${MAX_SNIPPET_LABEL}`;
-
-  document.querySelector('.mode-nav a[href="../send/"]')?.setAttribute("aria-current", "page");
-  if (DEMO) {
-    const current = document.querySelector('.mode-nav a[href="../send/"]');
-    if (current) current.textContent = "Demo";
-    for (const button of document.querySelectorAll<HTMLButtonElement>("[data-demo]")) {
-      button.addEventListener("click", () => void selectDemo(button.dataset.demo!));
-    }
-  } else {
-    cfgFile.addEventListener("change", () => void selectFile());
-    paneFile.addEventListener("dragenter", (event) => {
-      if (!isFileDrag(event)) return;
-      event.preventDefault();
-      fileDragDepth++;
-      setFileDragState(true);
-    });
-    paneFile.addEventListener("dragover", (event) => {
-      if (!isFileDrag(event)) return;
-      event.preventDefault();
-      event.dataTransfer!.dropEffect = "copy";
-      setFileDragState(true);
-    });
-    paneFile.addEventListener("dragleave", (event) => {
-      if (!isFileDrag(event)) return;
-      event.preventDefault();
-      fileDragDepth = Math.max(0, fileDragDepth - 1);
-      if (fileDragDepth === 0) setFileDragState(false);
-    });
-    paneFile.addEventListener("drop", (event) => {
-      if (!isFileDrag(event)) return;
-      event.preventDefault();
-      event.stopPropagation();
-      fileDragDepth = 0;
-      const file = event.dataTransfer?.files[0];
-      setFileDragState(false);
-      if (file) void selectFile(file);
-    });
-    // While a file is armed the picker label must NOT open the file dialog:
-    // preventDefault cancels the label→input forwarding, and only the button
-    // (or a keyboard activation of the hidden input, whose click bubbles up
-    // through the label) stops the stream.
-    paneFile.addEventListener("click", (event) => {
-      if (!paneFile.classList.contains("has-file")) return;
-      event.preventDefault();
-      const target = event.target instanceof Element ? event.target : null;
-      if (target && (target.closest(".file-picker-button") || target === cfgFile)) stopTransfer();
-    });
-    sendSnippetBtn.addEventListener("click", () => void selectSnippet());
-    for (const input of modeInputs) input.addEventListener("change", applyMode);
-  }
-  applyMode();
-  window.addEventListener("resize", () => resizeDisplay?.());
-  for (const el of [cfgFps, cfgBytes, cfgEcc, cfgSize]) {
-    el.addEventListener("change", () => void startStream());
-  }
-  await requestScreenWakeLock();
+function scrollStageIntoView(): void {
+  stage.scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center"});
 }
-
-/** Only on a fresh pick — a settings change restarts the stream too, and
- *  yanking the page down every time you nudge tx fps is worse than useless. */
-function scrollStageIntoView() {
-  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  requestAnimationFrame(() => {
-    stage.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
+cfgFile.addEventListener("change", () => void selectFile());
+sendSnippetBtn.addEventListener("click", () => void selectSnippet());
+snippetText.maxLength = MAX_SNIPPET_BYTES;
+snippetLabel.textContent = `待发送文本 · 最大 ${MAX_SNIPPET_LABEL}`;
+snippetText.addEventListener("input", () => {
+  // Editing prepared text invalidates the old payload; never send stale text.
+  if (selectedFile && !sending) { selectedFile = null; setStatus("文本已修改，请重新准备。"); }
+  updateControls();
+});
+for (const input of modeInputs) input.addEventListener("change", applyMode);
+startBtn.onclick = () => { if (selectedFile && !preparing && !sending) void startStream(true); };
+pauseBtn.onclick = () => {
+  if (!sending) return;
+  paused = !paused;
+  updateControls();
+  setStatus(paused ? "已暂停，接收端的当前进度可保留。" : `正在发送 ${selectedFile!.name}，等待接收端确认完成。`);
+};
+stopBtn.onclick = stopTransfer;
+expandBtn.onclick = () => setStageFullscreen(!document.body.classList.contains("qr-full"));
+window.addEventListener("keydown", event => { if (event.key === "Escape") setStageFullscreen(false); });
+window.addEventListener("resize", () => resizeDisplay?.());
+cfgSize.addEventListener("input", () => resizeDisplay?.());
+document.querySelector('.mode-nav a[href="../send/"]')?.setAttribute("aria-current", "page");
+for (const type of ["dragenter", "dragover", "dragleave", "drop"]) {
+  paneFile.addEventListener(type, event => {
+    const drag = event as DragEvent;
+    if (!Array.from(drag.dataTransfer?.types ?? []).includes("Files")) return;
+    event.preventDefault();
+    if (sending || preparing) { if (drag.dataTransfer) drag.dataTransfer.dropEffect = "none"; return; }
+    if (type === "dragenter") fileDragDepth++;
+    if (type === "dragleave") fileDragDepth = Math.max(0, fileDragDepth - 1);
+    if (type === "drop") { fileDragDepth = 0; void selectFile(drag.dataTransfer?.files[0]); }
+    paneFile.classList.toggle("is-dragover", type !== "drop" && (fileDragDepth > 0 || type === "dragover"));
   });
 }
+// Prevent accidental navigation when dropping a file outside the picker.
+for (const type of ["dragover", "drop"]) window.addEventListener(type, event => event.preventDefault());
+for (const button of document.querySelectorAll<HTMLButtonElement>("[data-demo]")) button.onclick = () => {
+  const name = button.dataset.demo!;
+  void startSelection("正在准备演示…", async () => {
+    const response = await fetch(`../${name}`);
+    if (!response.ok) throw new Error("演示文件不可用。");
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    return {name, size: bytes.length, packed: await packFile(name, "image/png", bytes)};
+  });
+};
+applyMode();
+guardNavigation(() => sending || preparing);
+void requestScreenWakeLock();
 
 async function startStream(revealStage = false) {
   const gen = ++generation;
+  paused = false;
+  sending = true;
+  updateControls();
   resizeDisplay = null;
   // Stale until this stream's first frame locks its version and refills them.
   showStreamPanels(false);
   if (!selectedFile) {
-    setStatus(idlePrompt(currentMode()));
+    sending = false;
+    updateControls();
+    setStatus("请先选择并准备内容。");
     return;
   }
   const { name, size: fileSize, payload, compression, transmittedSize } = selectedFile;
@@ -374,7 +247,6 @@ async function startStream(revealStage = false) {
   const txFps = Number(cfgFps.value);
   const frameBytes = Number(cfgBytes.value);
   const ecc = cfgEcc.value as "L" | "M" | "Q" | "H";
-  const displayPx = Number(cfgSize.value);
 
   const sessionId = (Math.floor(Math.random() * 0xffff) + 1) & 0xffff;
   const blockLen = blockLength(frameBytes);
@@ -385,13 +257,7 @@ async function startStream(revealStage = false) {
     const offered = [...cfgBytes.options].map((option) => Number(option.value));
     const suggestion =
       smallestSufficientFrameSize(payload.length, offered) ?? minimumFrameBytes(payload.length);
-    showError(
-      `${formatBytes(payload.length)} needs ` +
-        `${sourceBlockCount(payload.length, frameBytes).toLocaleString()} blocks at ` +
-        `${frameBytes} bytes per frame, and a frame can only number ` +
-        `${MAX_SOURCE_BLOCKS.toLocaleString()} of them. ` +
-        `Raise bytes / frame to ${suggestion} or more.`,
-    );
+    showError(`数据超过当前帧设置的容量。请将每帧字节数提高到 ${suggestion} 或以上。`);
     return;
   }
   const encoder = new LTEncoder(payload, blockLen, sessionId);
@@ -420,7 +286,7 @@ async function startStream(revealStage = false) {
       // Tap-to-fullscreen: the whole short viewport edge. The display-size
       // slider and page chrome are deliberately ignored — the point of the
       // mode is "as big as this device goes".
-      cssBudget = Math.min(window.innerWidth, window.innerHeight);
+      cssBudget = Math.min(window.innerWidth - 40, window.innerHeight - 100);
     } else {
       const containerWidth =
         stage.parentElement?.getBoundingClientRect().width ?? window.innerWidth;
@@ -430,13 +296,13 @@ async function startStream(revealStage = false) {
         Number.parseFloat(stageStyle.paddingRight) +
         Number.parseFloat(stageStyle.borderLeftWidth) +
         Number.parseFloat(stageStyle.borderRightWidth);
-      cssBudget = fitQrDisplaySize(
+      cssBudget = Math.min(Math.max(240, window.innerHeight - 440), fitQrDisplaySize(
         window.innerWidth,
         window.innerHeight,
         containerWidth,
-        displayPx,
+        Number(cfgSize.value),
         horizontalChrome,
-      );
+      ));
     }
     scale = Math.max(1, Math.floor((cssBudget * dpr) / total));
     staging.width = total;
@@ -462,7 +328,7 @@ async function startStream(revealStage = false) {
       resizeDisplay = sizeCanvas;
       // Scroll only now: before sizeCanvas() the canvas is still 16×16, so the
       // scroll target would be the wrong height.
-      if (revealStage) scrollStageIntoView();
+      if (revealStage && window.innerWidth < 741) scrollStageIntoView();
       // The stream's parameters live at the bottom of Transfer settings, next
       // to the knobs that produced them; the status line stays for prose.
       spec("spec-fps").textContent = `${txFps} fps`;
@@ -470,19 +336,11 @@ async function startStream(revealStage = false) {
       spec("spec-qr").textContent = `V${version} · ECC ${ecc}`;
       spec("spec-payload").textContent = `${name} · ${formatBytes(fileSize)}`;
       spec("spec-compression").textContent =
-        compression === "gzip" ? `gzip → ${formatBytes(transmittedSize)}` : "none";
+        compression === "gzip" ? `gzip → ${formatBytes(transmittedSize)}` : "无需压缩";
       spec("spec-k").textContent = `K = ${encoder.k}`;
       showStreamPanels(true);
-      // The tail of the status line is the door to the share dialog. Built by
-      // hand because setStatus is textContent-only — and the next setStatus
-      // wiping the button out is exactly right.
-      setStatus(`Streaming ${name} — `);
-      const share = document.createElement("button");
-      share.type = "button";
-      share.className = "text-button";
-      share.textContent = "Share receiver link";
-      share.addEventListener("click", openShareDialog);
-      specs.append(share);
+      setStatus(`正在发送 ${name}。接收端完成后，请手动终止传输。`);
+      footerHint.textContent = "保持二维码可见，等待接收端确认完成";
     }
     const raster = rasterizeQr(qr.modules.size, qr.modules.data, MARGIN);
     return new ImageData(new Uint8ClampedArray(raster.pixels.buffer), raster.size, raster.size);
@@ -517,6 +375,7 @@ async function startStream(revealStage = false) {
     // rAF loop rather than spinning on an empty queue until a settings change.
     if (gen !== generation || generatorFailed) return;
     requestAnimationFrame(tick);
+    if (paused) { nextAt = now; return; }
     if (now < nextAt) return;
     const img = queue.shift();
     pump(1);
@@ -533,5 +392,3 @@ async function startStream(revealStage = false) {
   };
   requestAnimationFrame(tick);
 }
-
-void main();
