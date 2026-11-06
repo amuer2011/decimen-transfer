@@ -1,0 +1,35 @@
+extends: desktop/electron-builder.yml
+appId: com.decimen.opticaltransfer.text
+productName: Decimen Optical Transfer Text
+extraMetadata:
+  name: decimen-optical-transfer-text
+  description: Offline text-only transfer using animated QR codes.
+publish:
+  channel: text
+directories:
+  output: artifacts/desktop/text
+# Map only the text build to the runtime's dist root. Never package dist/ here.
+files:
+  # electron-builder merges inherited file patterns; explicitly exclude the
+  # full edition before mapping dist-text into the archive's dist directory.
+  - "!dist{,/**/*}"
+  - desktop/**
+  - package.json
+  - from: dist-text
+    to: dist
+    filter:
+      - "**/*"
+      - "!success*.png"
+      - "!og.png"
+mac:
+  artifactName: Decimen.Optical.Transfer.Text-v${version}-mac-${arch}.${ext}
+win:
+  artifactName: Decimen.Optical.Transfer.Text-v${version}-win-${arch}.${ext}
+nsis:
+  artifactName: Decimen.Optical.Transfer.Text-v${version}-win-${arch}-Setup.${ext}
+linux:
+  executableName: decimen-optical-transfer-text
+  desktop:
+    entry:
+      StartupWMClass: decimen-optical-transfer-text
+  artifactName: Decimen.Optical.Transfer.Text-${version}-kylin-aarch64.${ext}

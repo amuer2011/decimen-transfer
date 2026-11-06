@@ -28,6 +28,7 @@ export function confirmAction(title: string, detail: string, action: string): Pr
 }
 
 export function guardNavigation(active: () => boolean): void {
+  window.decimenUpdates?.setActivityGuard(active);
   let asking = false;
   let leaving = false;
   window.addEventListener("beforeunload", event => {

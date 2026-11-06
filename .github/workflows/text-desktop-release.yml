@@ -1,0 +1,93 @@
+name: Text-only Desktop
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref to build (empty = selected branch/tag)
+        required: false
+        type: string
+      release_tag:
+        description: Existing release tag to attach text packages to (empty = artifacts only)
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: text-desktop-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: mac
+            os: macos-latest
+            command: desktop:text:mac
+            path: artifacts/desktop/text/*.dmg
+          - platform: windows
+            os: windows-latest
+            command: desktop:text:win:all
+            path: artifacts/desktop/text/*.exe
+          - platform: win7
+            os: windows-latest
+            command: desktop:text:win7:all
+            path: |
+              artifacts/desktop/text/win7/*.exe
+              artifacts/desktop/text/win7/SHA256SUMS-text-win7.txt
+          - platform: kylin-aarch64
+            os: ubuntu-22.04
+            command: desktop:text:kylin
+            path: artifacts/desktop/text/*.deb
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run ${{ matrix.command }}
+      - name: Verify Kylin architecture
+        if: matrix.platform == 'kylin-aarch64'
+        shell: bash
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          test "$(dpkg-deb -f "artifacts/desktop/text/Decimen.Optical.Transfer.Text-${version}-kylin-aarch64.deb" Architecture)" = "arm64"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: text-${{ matrix.platform }}
+          path: ${{ matrix.path }}
+          if-no-files-found: error
+          compression-level: 0
+
+  release:
+    needs: build
+    if: >-
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+      (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: text-*
+          path: release
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.release_tag || github.ref_name }}
+          fail_on_unmatched_files: true
+          files: |
+            release/**/*.exe
+            release/**/*.dmg
+            release/**/*.deb
+            release/**/SHA256SUMS-text-win7.txt

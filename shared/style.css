@@ -361,6 +361,12 @@ h2 {
   gap: 22px;
   align-items: start;
 }
+.send-shell {
+  max-width: 1400px;
+}
+.send-shell .workspace {
+  grid-template-columns: 320px minmax(0, 1fr);
+}
 .control-panel,
 .display-panel {
   min-width: 0;
@@ -984,6 +990,9 @@ textarea {
   .workspace {
     grid-template-columns: 1fr;
   }
+  .send-shell .workspace {
+    grid-template-columns: 1fr;
+  }
   .send-shell,
   .receiver-shell {
     padding: 30px 20px;
@@ -993,6 +1002,9 @@ textarea {
   }
   .display-panel {
     min-height: 380px;
+  }
+  .send-shell .display-panel {
+    padding: 12px;
   }
   .display-empty {
     min-height: 280px;

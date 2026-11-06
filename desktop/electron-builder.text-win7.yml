@@ -1,0 +1,14 @@
+extends: desktop/electron-builder.text.yml
+appId: com.decimen.opticaltransfer.text.win7
+productName: Decimen Optical Transfer Text Win7
+extraMetadata:
+  name: decimen-optical-transfer-text-win7
+electronVersion: 22.3.27
+publish:
+  channel: text-win7
+directories:
+  output: artifacts/desktop/text/win7
+win:
+  artifactName: Decimen.Optical.Transfer.Text-v${version}-win7-x64.${ext}
+nsis:
+  artifactName: Decimen.Optical.Transfer.Text-v${version}-win7-x64-Setup.${ext}

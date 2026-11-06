@@ -1,7 +1,7 @@
 {
   "name": "decimen-optical-transfer",
   "private": true,
-  "version": "1.0.7",
+  "version": "1.0.8",
   "main": "desktop/main.cjs",
   "license": "MIT",
   "description": "Offline file and text transfer using fountain-coded animated QR codes and screen/window capture.",
@@ -16,12 +16,28 @@
     "build": "tsc && tsc -p tsconfig.node.json && vite build",
     "build:standalone": "node -e \"require('node:fs').rmSync('dist-standalone',{recursive:true,force:true})\" && tsc && vite build --mode standalone-send && vite build --mode standalone-receive",
     "build:all": "npm run build && npm run build:standalone",
+    "build:text": "tsc && tsc -p tsconfig.node.json && vite build --mode text",
+    "build:text:standalone": "node -e \"require('node:fs').rmSync('dist-text-standalone',{recursive:true,force:true})\" && tsc && vite build --mode text-standalone-send && vite build --mode text-standalone-receive",
+    "build:text:all": "npm run build:text && npm run build:text:standalone",
     "desktop:dev": "npm run build && electron .",
     "desktop:package": "npm run build && electron-builder --config desktop/electron-builder.yml",
     "desktop:kylin": "npm run build && electron-builder --config desktop/electron-builder.yml --linux deb --arm64 --publish never",
     "desktop:mac": "npm run build && electron-builder --config desktop/electron-builder.yml --mac --x64 --arm64 --publish never",
     "desktop:win": "npm run build && electron-builder --config desktop/electron-builder.yml --win --x64 --publish never",
     "desktop:win7": "npm run build && electron-builder --config desktop/electron-builder.win7.yml --win --x64 --publish never && node build/verify-win7.cjs",
+    "desktop:win:installer": "npm run build && electron-builder --config desktop/electron-builder.yml --win nsis --x64 --publish never",
+    "desktop:win7:installer": "npm run build && electron-builder --config desktop/electron-builder.win7.yml --win nsis --x64 --publish never && node build/verify-win7.cjs --installer",
+    "desktop:win:all": "npm run build && electron-builder --config desktop/electron-builder.yml --win portable nsis --x64 --publish never",
+    "desktop:win7:all": "npm run build && electron-builder --config desktop/electron-builder.win7.yml --win portable nsis --x64 --publish never && node build/verify-win7.cjs --all",
+    "desktop:text:package": "npm run build:text && electron-builder --config desktop/electron-builder.text.yml",
+    "desktop:text:kylin": "npm run build:text && electron-builder --config desktop/electron-builder.text.yml --linux deb --arm64 --publish never",
+    "desktop:text:mac": "npm run build:text && electron-builder --config desktop/electron-builder.text.yml --mac --x64 --arm64 --publish never",
+    "desktop:text:win": "npm run build:text && electron-builder --config desktop/electron-builder.text.yml --win --x64 --publish never",
+    "desktop:text:win7": "npm run build:text && electron-builder --config desktop/electron-builder.text-win7.yml --win --x64 --publish never && node build/verify-win7.cjs --text",
+    "desktop:text:win:installer": "npm run build:text && electron-builder --config desktop/electron-builder.text.yml --win nsis --x64 --publish never",
+    "desktop:text:win7:installer": "npm run build:text && electron-builder --config desktop/electron-builder.text-win7.yml --win nsis --x64 --publish never && node build/verify-win7.cjs --text --installer",
+    "desktop:text:win:all": "npm run build:text && electron-builder --config desktop/electron-builder.text.yml --win portable nsis --x64 --publish never",
+    "desktop:text:win7:all": "npm run build:text && electron-builder --config desktop/electron-builder.text-win7.yml --win portable nsis --x64 --publish never && node build/verify-win7.cjs --text --all",
     "preview": "vite preview",
     "icons": "node --import tsx build/make-icons.ts",
     "test": "node --import tsx --test tests/*.test.ts"
@@ -40,5 +56,10 @@
     "vite-plugin-pwa": "^1.3.0",
     "vite-plugin-singlefile": "^2.3.3",
     "zxing-wasm": "^2.0.0"
+  },
+  "dependencies": {
+    "electron-updater": "6.8.11",
+    "js-yaml": "4.1.1",
+    "semver": "7.7.3"
   }
 }

@@ -6,14 +6,108 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing tag to build and attach artifacts to
+        description: Existing version tag to build and publish
         required: true
+        type: string
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: complete-release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
 
 jobs:
-  release:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Check tag and version
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: node -e 'if(process.env.RELEASE_TAG !== "v"+require("./package.json").version)process.exit(1)'
+      - run: npm test
+
+  desktop:
+    needs: validate
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: windows-full
+            os: windows-latest
+            command: desktop:win:all
+            path: artifacts/desktop
+          - name: win7-full
+            os: windows-latest
+            command: desktop:win7:all
+            path: artifacts/desktop/win7
+          - name: windows-text
+            os: windows-latest
+            command: desktop:text:win:all
+            path: artifacts/desktop/text
+          - name: win7-text
+            os: windows-latest
+            command: desktop:text:win7:all
+            path: artifacts/desktop/text/win7
+          - name: mac-full
+            os: macos-latest
+            command: desktop:mac
+            path: artifacts/desktop
+          - name: mac-text
+            os: macos-latest
+            command: desktop:text:mac
+            path: artifacts/desktop/text
+          - name: kylin-full
+            os: ubuntu-22.04
+            command: desktop:kylin
+            path: artifacts/desktop
+          - name: kylin-text
+            os: ubuntu-22.04
+            command: desktop:text:kylin
+            path: artifacts/desktop/text
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run ${{ matrix.command }}
+      - name: Verify Kylin architecture
+        if: startsWith(matrix.name, 'kylin')
+        shell: bash
+        env:
+          OUTPUT: ${{ matrix.path }}
+        run: |
+          for deb in "$OUTPUT"/*.deb; do test "$(dpkg-deb -f "$deb" Architecture)" = arm64; done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.name }}
+          path: |
+            ${{ matrix.path }}/*.exe
+            ${{ matrix.path }}/*.dmg
+            ${{ matrix.path }}/*.zip
+            ${{ matrix.path }}/*.deb
+            ${{ matrix.path }}/*.yml
+            ${{ matrix.path }}/*.blockmap
+            !${{ matrix.path }}/builder-*.yml
+          if-no-files-found: error
+          compression-level: 0
+
+  web:
+    needs: validate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -25,25 +119,51 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm test
-      - run: npm run build:all
-
-      - name: Package artifacts
+      - run: npm run build:all && npm run build:text:all
+      - name: Package both web editions
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
         run: |
-          TAG="${{ inputs.tag || github.ref_name }}"
-          mkdir -p artifacts
-          # The hostable site: unzip onto any static host, or open over a local
-          # server. Registers a service worker, so it runs offline after one visit.
-          (cd dist && zip -qr "../artifacts/decimen-$TAG-site.zip" .)
-          # The two self-contained pages: no server, no network, no install.
-          cp dist-standalone/decimen-sender.html "artifacts/decimen-$TAG-sender.html"
-          cp dist-standalone/decimen-receiver.html "artifacts/decimen-$TAG-receiver.html"
-          (cd artifacts && sha256sum ./* > SHA256SUMS.txt)
-          ls -la artifacts
-
-      - uses: softprops/action-gh-release@v2
+          mkdir -p web-assets
+          (cd dist && zip -qr "../web-assets/decimen-$RELEASE_TAG-site.zip" .)
+          (cd dist-text && zip -qr "../web-assets/decimen-$RELEASE_TAG-text-site.zip" .)
+          cp dist-standalone/*.html dist-text-standalone/*.html web-assets/
+      - uses: actions/upload-artifact@v4
         with:
-          tag_name: ${{ inputs.tag || github.ref_name }}
-          name: ${{ inputs.tag || github.ref_name }}
-          generate_release_notes: true
-          files: artifacts/*
+          name: release-web
+          path: web-assets/*
+
+  publish:
+    needs: [desktop, web]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: collected
+      - name: Validate all packages and update feeds
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: node build/prepare-release.cjs collected release "$RELEASE_TAG"
+      - name: Publish complete release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          if gh release view "$RELEASE_TAG" --json isDraft --jq '.isDraft' > existing-draft.txt 2>/dev/null; then
+            test "$(cat existing-draft.txt)" = true || { echo 'This release is already public; publish a new version instead.'; exit 1; }
+          else
+            gh release create "$RELEASE_TAG" --draft --title "$RELEASE_TAG" --notes-file RELEASE_NOTES.md --verify-tag
+          fi
+          gh release upload "$RELEASE_TAG" release/* --clobber
+          gh release edit "$RELEASE_TAG" --draft=false --latest

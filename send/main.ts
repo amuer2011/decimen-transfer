@@ -28,7 +28,7 @@ import { requestScreenWakeLock } from "../shared/wake-lock";
 
 const MARGIN = 4;
 const LOOKAHEAD = 3;
-const DEMO = import.meta.env.VITE_DEMO === "1";
+const DEMO = !__TEXT_ONLY__ && import.meta.env.VITE_DEMO === "1";
 const el = (id: string) => document.getElementById(id)!;
 const canvas = el("qr") as HTMLCanvasElement;
 const stage = el("stage");
@@ -69,22 +69,24 @@ const specsLine = statusLine(specs);
 const setStatus = specsLine.setStatus;
 type SendMode = "file" | "snippet";
 function currentMode(): SendMode {
+  if (__TEXT_ONLY__) return "snippet";
   return modeInputs.find(input => input.checked)?.value === "snippet" ? "snippet" : "file";
 }
 function showStreamPanels(visible: boolean): void { streamSpecs.hidden = !visible; }
 function updateFilePicker(): void {
+  if (__TEXT_ONLY__) return;
   filePickerButton.textContent = selectedFile ? "更换文件" : "选择文件";
   filePickerLabel.textContent = selectedFile ? `${selectedFile.name} · ${formatBytes(selectedFile.size)}` : `或拖放到这里 · 最大 ${MAX_FILE_LABEL}`;
 }
 function updateControls(): void {
   const locked = sending || preparing;
-  cfgFile.disabled = locked;
+  if (!__TEXT_ONLY__) cfgFile.disabled = locked;
   snippetText.disabled = locked;
   sendSnippetBtn.disabled = locked || !snippetText.value.trim();
   for (const input of modeInputs) input.disabled = locked;
   for (const input of [cfgFps, cfgBytes, cfgEcc]) input.disabled = locked;
   for (const button of document.querySelectorAll<HTMLButtonElement>('[data-demo]')) button.disabled = locked;
-  paneFile.classList.toggle("is-locked", locked);
+  if (!__TEXT_ONLY__) paneFile.classList.toggle("is-locked", locked);
   startBtn.hidden = sending;
   startBtn.disabled = !selectedFile || preparing;
   pauseBtn.hidden = !sending;
@@ -119,7 +121,7 @@ function stopTransfer(): void {
   stage.hidden = true;
   canvas.getContext("2d")!.clearRect(0, 0, canvas.width, canvas.height);
   showStreamPanels(false);
-  cfgFile.value = "";
+  if (!__TEXT_ONLY__) cfgFile.value = "";
   footerHint.textContent = "二维码仅在开始传输后显示";
   updateControls();
   setStatus("已清除传输。可以选择新的内容。");
@@ -131,10 +133,12 @@ function setStageFullscreen(on: boolean): void {
 }
 function applyMode(): void {
   stopTransfer();
-  modePicker.hidden = DEMO;
-  paneFile.hidden = DEMO || currentMode() !== "file";
+  if (!__TEXT_ONLY__) {
+    modePicker.hidden = DEMO;
+    paneFile.hidden = DEMO || currentMode() !== "file";
+    paneDemo.hidden = !DEMO;
+  }
   paneSnippet.hidden = DEMO || currentMode() !== "snippet";
-  paneDemo.hidden = !DEMO;
   toolTitle.textContent = currentMode() === "snippet" ? "发送文本" : "发送文件";
   setStatus(currentMode() === "snippet" ? "输入文本后点击「准备文本」" : "选择文件或拖放到上方区域");
 }
@@ -178,7 +182,7 @@ async function selectSnippet(): Promise<void> {
 function scrollStageIntoView(): void {
   stage.scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center"});
 }
-cfgFile.addEventListener("change", () => void selectFile());
+if (!__TEXT_ONLY__) cfgFile.addEventListener("change", () => void selectFile());
 sendSnippetBtn.addEventListener("click", () => void selectSnippet());
 snippetText.maxLength = MAX_SNIPPET_BYTES;
 snippetLabel.textContent = `待发送文本 · 最大 ${MAX_SNIPPET_LABEL}`;
@@ -201,7 +205,7 @@ window.addEventListener("keydown", event => { if (event.key === "Escape") setSta
 window.addEventListener("resize", () => resizeDisplay?.());
 cfgSize.addEventListener("input", () => resizeDisplay?.());
 document.querySelector('.mode-nav a[href="../send/"]')?.setAttribute("aria-current", "page");
-for (const type of ["dragenter", "dragover", "dragleave", "drop"]) {
+if (!__TEXT_ONLY__) for (const type of ["dragenter", "dragover", "dragleave", "drop"]) {
   paneFile.addEventListener(type, event => {
     const drag = event as DragEvent;
     if (!Array.from(drag.dataTransfer?.types ?? []).includes("Files")) return;
@@ -215,7 +219,7 @@ for (const type of ["dragenter", "dragover", "dragleave", "drop"]) {
 }
 // Prevent accidental navigation when dropping a file outside the picker.
 for (const type of ["dragover", "drop"]) window.addEventListener(type, event => event.preventDefault());
-for (const button of document.querySelectorAll<HTMLButtonElement>("[data-demo]")) button.onclick = () => {
+if (!__TEXT_ONLY__) for (const button of document.querySelectorAll<HTMLButtonElement>("[data-demo]")) button.onclick = () => {
   const name = button.dataset.demo!;
   void startSelection("正在准备演示…", async () => {
     const response = await fetch(`../${name}`);
@@ -288,15 +292,14 @@ async function startStream(revealStage = false) {
       // mode is "as big as this device goes".
       cssBudget = Math.min(window.innerWidth - 40, window.innerHeight - 100);
     } else {
-      const containerWidth =
-        stage.parentElement?.getBoundingClientRect().width ?? window.innerWidth;
+      const containerWidth = stage.getBoundingClientRect().width;
       const stageStyle = getComputedStyle(stage);
       const horizontalChrome =
         Number.parseFloat(stageStyle.paddingLeft) +
         Number.parseFloat(stageStyle.paddingRight) +
         Number.parseFloat(stageStyle.borderLeftWidth) +
         Number.parseFloat(stageStyle.borderRightWidth);
-      cssBudget = Math.min(Math.max(240, window.innerHeight - 440), fitQrDisplaySize(
+      cssBudget = Math.min(Math.max(240, window.innerHeight - 300), fitQrDisplaySize(
         window.innerWidth,
         window.innerHeight,
         containerWidth,
@@ -328,7 +331,10 @@ async function startStream(revealStage = false) {
       resizeDisplay = sizeCanvas;
       // Scroll only now: before sizeCanvas() the canvas is still 16×16, so the
       // scroll target would be the wrong height.
-      if (revealStage && window.innerWidth < 741) scrollStageIntoView();
+      if (revealStage) {
+        const bounds = stage.getBoundingClientRect();
+        if (window.innerWidth < 741 || bounds.top < 0 || bounds.bottom > window.innerHeight) scrollStageIntoView();
+      }
       // The stream's parameters live at the bottom of Transfer settings, next
       // to the knobs that produced them; the status line stays for prose.
       spec("spec-fps").textContent = `${txFps} fps`;

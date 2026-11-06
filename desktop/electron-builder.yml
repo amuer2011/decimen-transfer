@@ -10,10 +10,19 @@ files:
   - dist/**
   - package.json
 asar: true
+publish:
+  provider: generic
+  url: https://github.com/amuer2011/decimen-transfer/releases/latest/download/
+  channel: latest
+generateUpdatesFilesForAllChannels: false
 mac:
   category: public.app-category.utilities
   target:
     - target: dmg
+      arch:
+        - x64
+        - arm64
+    - target: zip
       arch:
         - x64
         - arm64
@@ -25,6 +34,11 @@ win:
       arch:
         - x64
   artifactName: Decimen.Optical.Transfer-v${version}-win-${arch}.${ext}
+nsis:
+  artifactName: Decimen.Optical.Transfer-v${version}-win-${arch}-Setup.${ext}
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
 linux:
   category: Utility
   maintainer: Decimen

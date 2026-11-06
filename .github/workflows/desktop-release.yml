@@ -1,9 +1,6 @@
 name: Desktop Release
 
 on:
-  push:
-    tags:
-      - "v*"
   workflow_dispatch:
     inputs:
       tag:
@@ -66,7 +63,7 @@ jobs:
         run: npm ci
 
       - name: Build Windows
-        run: npm run desktop:win
+        run: npm run desktop:win:all
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4

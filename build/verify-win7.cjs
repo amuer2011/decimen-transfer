@@ -7,11 +7,16 @@ const assert = require("node:assert/strict");
 
 async function verify() {
   const { version } = require("../package.json");
-  const output = path.resolve(__dirname, "../artifacts/desktop/win7");
-  const fileName = `Decimen.Optical.Transfer-v${version}-win7-x64.exe`;
-  const portable = path.join(output, fileName);
-  const executable = path.join(output, "win-unpacked/Decimen Optical Transfer Win7.exe");
-  assert.ok(fs.statSync(portable).size > 50 * 1024 * 1024, "Portable EXE missing or too small");
+  const textOnly = process.argv.includes("--text");
+  const all = process.argv.includes("--all");
+  const installer = process.argv.includes("--installer");
+  const output = path.resolve(__dirname, textOnly ? "../artifacts/desktop/text/win7" : "../artifacts/desktop/win7");
+  const stem = `Decimen.Optical.Transfer${textOnly ? ".Text" : ""}-v${version}-win7-x64`;
+  const files = (all ? [false, true] : [installer]).map(setup => `${stem}${setup ? "-Setup" : ""}.exe`);
+  const executable = path.join(output, `win-unpacked/Decimen Optical Transfer${textOnly ? " Text" : ""} Win7.exe`);
+  for (const fileName of files) {
+    assert.ok(fs.statSync(path.join(output, fileName)).size > 50 * 1024 * 1024, `${fileName} missing or too small`);
+  }
   assert.ok(fs.existsSync(path.join(output, "win-unpacked/resources/app.asar")), "app.asar missing");
   const header = Buffer.alloc(8192);
   const fd = fs.openSync(executable, "r");
@@ -30,14 +35,19 @@ async function verify() {
   if (runtime.error) throw runtime.error;
   assert.equal(runtime.status, 0, runtime.stderr);
   assert.equal(runtime.stdout.trim(), "22.3.27", "Wrong Electron runtime");
-  const hash = createHash("sha256");
-  for await (const chunk of fs.createReadStream(portable)) hash.update(chunk);
-  const digest = hash.digest("hex");
-  fs.writeFileSync(path.join(output, "SHA256SUMS-win7.txt"), `${digest}  ${fileName}\n`, "ascii");
-  console.log(`Verified x64 / Electron 22.3.27: ${fileName}\nSHA-256: ${digest}`);
+  let checksums = "";
+  for (const fileName of files) {
+    const hash = createHash("sha256");
+    for await (const chunk of fs.createReadStream(path.join(output, fileName))) hash.update(chunk);
+    const digest = hash.digest("hex");
+    checksums += `${digest}  ${fileName}\n`;
+    console.log(`Verified x64 / Electron 22.3.27: ${fileName}\nSHA-256: ${digest}`);
+  }
+  const checksumName = `SHA256SUMS-${textOnly ? "text-" : ""}win7${installer && !all ? "-setup" : ""}.txt`;
+  fs.writeFileSync(path.join(output, checksumName), checksums, "ascii");
   if (process.env.GITHUB_STEP_SUMMARY) {
     fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,
-      `### Win7 SP1 x64\n\nFile: ${fileName}\n\nElectron 22.3.27 / Chromium 108\n\nSHA-256: ${digest}\n`);
+      `### Win7 SP1 x64${textOnly ? " Text" : ""}\n\nElectron 22.3.27 / Chromium 108\n\n\`\`\`\n${checksums}\`\`\`\n`);
   }
 }
 verify().catch(error => { console.error(error); process.exitCode = 1; });

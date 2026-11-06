@@ -9,7 +9,7 @@ import {
 import { createDecodeWorker } from "./worker-factory";
 import { NoSignalHintTimer } from "../shared/no-signal";
 import { DecodeWorkerPool } from "../shared/worker-pool";
-import { isSnippet, snippetText } from "../shared/snippet";
+import { isSnippet, snippetText, MAX_SNIPPET_BYTES } from "../shared/snippet";
 import {
   fnv1a,
   parseFrame,
@@ -394,6 +394,9 @@ async function finish(container: Uint8Array, hashOk: boolean, seconds: number) {
   try {
     if (!hashOk) throw new Error("传输数据校验不一致，请重新发送。");
     const file = await unpackFile(container);
+    if (__TEXT_ONLY__ && (!isSnippet(file) || file.bytes.length > MAX_SNIPPET_BYTES)) {
+      throw new Error("文本专用版仅支持文本片段，请在发送端使用「文本」模式，或使用完整版本接收文件。");
+    }
     if (!(await verifyFile(file))) throw new Error("文件 SHA-256 校验失败，请重新发送。");
 
     const rate = (container.length / 1024 / Math.max(.1, seconds)).toFixed(1);
@@ -409,78 +412,80 @@ async function finish(container: Uint8Array, hashOk: boolean, seconds: number) {
       return;
     }
 
-    progressLabel.textContent = "100% · 文件已恢复";
-    const kb = Math.round(file.bytes.length / 1024);
-    setStatus("");
-    const summary = document.createElement("p");
-    summary.className = "hint";
-    summary.textContent =
-      `${kb} KB · ${seconds.toFixed(1)} 秒 · ${rate} KB/s · ${gzipNote}SHA-256 校验通过 ✓`;
-    const heading = document.createElement("div");
-    heading.className = "done";
-    heading.textContent = "文件已接收";
-    const url = URL.createObjectURL(new Blob([file.bytes as BlobPart], { type: file.type }));
-    receivedUrl = url;
-    const download = document.createElement("a");
-    download.className = "download";
-    download.href = url;
-    download.download = file.name;
-    download.addEventListener("click", () => { resultSaved = true; });
-    download.textContent = `保存 ${file.name}`;
-    result.replaceChildren(heading, summary);
-    if (file.type.startsWith("image/")) {
-      const image = document.createElement("img");
-      image.className = "received";
-      image.alt = `文件预览：${file.name}`;
-      image.src = url;
-      result.append(image);
-    } else if (file.type.startsWith("video/") || file.type.startsWith("audio/")) {
-      const player = document.createElement(file.type.startsWith("video/") ? "video" : "audio");
-      player.className = "received";
-      player.controls = true;
-      player.preload = "metadata";
-      player.setAttribute("aria-label", `接收的文件：${file.name}`);
-      if (player instanceof HTMLVideoElement) player.playsInline = true;
-      const src = await servableMediaUrl(file, url);
-      if (src !== url) {
-        player.addEventListener("error", () => { player.src = url; }, { once: true });
-      }
-      player.src = src;
-      result.append(player);
-    }
-    const actions = document.createElement("div");
-    actions.className = "note-actions";
-    actions.append(download);
-    const desktop = window.decimenDesktop;
-    if (desktop) {
-      const openFolder = document.createElement("button");
-      openFolder.type = "button";
-      openFolder.className = "secondary-button";
-      openFolder.textContent = "打开保存目录";
-      openFolder.hidden = true;
-      desktop.onDownloadCompleted(() => {
-        openFolder.hidden = false;
-      });
-      openFolder.addEventListener("click", async () => {
-        openFolder.disabled = true;
-        try {
-          await desktop.openTargetFolder();
-        } catch {
-          openFolder.textContent = "打开失败，请重试";
-          setTimeout(() => {
-            openFolder.textContent = "打开保存目录";
-          }, 1500);
-        } finally {
-          openFolder.disabled = false;
+    if (!__TEXT_ONLY__) {
+      progressLabel.textContent = "100% · 文件已恢复";
+      const kb = Math.round(file.bytes.length / 1024);
+      setStatus("");
+      const summary = document.createElement("p");
+      summary.className = "hint";
+      summary.textContent =
+        `${kb} KB · ${seconds.toFixed(1)} 秒 · ${rate} KB/s · ${gzipNote}SHA-256 校验通过 ✓`;
+      const heading = document.createElement("div");
+      heading.className = "done";
+      heading.textContent = "文件已接收";
+      const url = URL.createObjectURL(new Blob([file.bytes as BlobPart], { type: file.type }));
+      receivedUrl = url;
+      const download = document.createElement("a");
+      download.className = "download";
+      download.href = url;
+      download.download = file.name;
+      download.addEventListener("click", () => { resultSaved = true; });
+      download.textContent = `保存 ${file.name}`;
+      result.replaceChildren(heading, summary);
+      if (file.type.startsWith("image/")) {
+        const image = document.createElement("img");
+        image.className = "received";
+        image.alt = `文件预览：${file.name}`;
+        image.src = url;
+        result.append(image);
+      } else if (file.type.startsWith("video/") || file.type.startsWith("audio/")) {
+        const player = document.createElement(file.type.startsWith("video/") ? "video" : "audio");
+        player.className = "received";
+        player.controls = true;
+        player.preload = "metadata";
+        player.setAttribute("aria-label", `接收的文件：${file.name}`);
+        if (player instanceof HTMLVideoElement) player.playsInline = true;
+        const src = await servableMediaUrl(file, url);
+        if (src !== url) {
+          player.addEventListener("error", () => { player.src = url; }, { once: true });
         }
-      });
-      actions.append(openFolder);
+        player.src = src;
+        result.append(player);
+      }
+      const actions = document.createElement("div");
+      actions.className = "note-actions";
+      actions.append(download);
+      const desktop = window.decimenDesktop;
+      if (desktop) {
+        const openFolder = document.createElement("button");
+        openFolder.type = "button";
+        openFolder.className = "secondary-button";
+        openFolder.textContent = "打开保存目录";
+        openFolder.hidden = true;
+        desktop.onDownloadCompleted(() => {
+          openFolder.hidden = false;
+        });
+        openFolder.addEventListener("click", async () => {
+          openFolder.disabled = true;
+          try {
+            await desktop.openTargetFolder();
+          } catch {
+            openFolder.textContent = "打开失败，请重试";
+            setTimeout(() => {
+              openFolder.textContent = "打开保存目录";
+            }, 1500);
+          } finally {
+            openFolder.disabled = false;
+          }
+        });
+        actions.append(openFolder);
+      }
+      const endActions = document.createElement("div");
+      endActions.className = "note-actions";
+      endActions.append(restartButton("接收下一份"));
+      if ("caches" in window) endActions.append(clearCacheButton());
+      result.append(actions, endActions);
     }
-    const endActions = document.createElement("div");
-    endActions.className = "note-actions";
-    endActions.append(restartButton("接收下一份"));
-    if ("caches" in window) endActions.append(clearCacheButton());
-    result.append(actions, endActions);
   } catch (error) {
     el("receive-state").textContent = "校验失败";
     resultSaved = true; // A failed checksum has no usable result to preserve.

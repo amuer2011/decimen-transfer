@@ -4,9 +4,6 @@ name: Win7 Desktop
 # building the Electron 40 package for Windows 10+; this workflow never touches
 # that build or its output directory.
 on:
-  push:
-    tags:
-      - "v*"
   workflow_dispatch:
     inputs:
       ref:
@@ -29,7 +26,7 @@ concurrency:
 
 jobs:
   build:
-    name: Build Win7 SP1 x64 portable EXE
+    name: Build Win7 SP1 x64 portable and installer EXEs
     runs-on: windows-latest
     permissions:
       contents: read
@@ -52,8 +49,8 @@ jobs:
       - name: Test
         run: npm test
 
-      - name: Build Win7 portable EXE
-        run: npm run desktop:win7
+      - name: Build Win7 portable and installer EXEs
+        run: npm run desktop:win7:all
 
       - name: Upload Win7 artifact
         uses: actions/upload-artifact@v4

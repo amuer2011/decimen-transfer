@@ -18,6 +18,8 @@ extraMetadata:
 # Last Electron release with Chromium 108; EOL 2023-10-10, no further security
 # fixes. Keep this exact pin for the Win7 channel.
 electronVersion: 22.3.27
+publish:
+  channel: win7
 
 directories:
   # Dedicated output tree, so this build cannot overwrite (or be overwritten by)
@@ -31,3 +33,5 @@ win:
       arch:
         - x64
   artifactName: Decimen.Optical.Transfer-v${version}-win7-x64.${ext}
+nsis:
+  artifactName: Decimen.Optical.Transfer-v${version}-win7-x64-Setup.${ext}

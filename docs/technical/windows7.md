@@ -9,22 +9,36 @@
 ```powershell
 npm ci
 npm test
-npm run desktop:win7
+npm run desktop:win7            # 便携版
+npm run desktop:win7:installer  # 安装版
+npm run desktop:win7:all        # 同时生成两种格式
 ```
 
 产物在 `artifacts/desktop/win7/Decimen.Optical.Transfer-v<version>-win7-x64.exe`。用户无需 Node.js。配置为 `desktop/electron-builder.win7.yml`，继承路径相对项目根目录。Win7 使用独立名称、appId 与输出目录，避免与常规版本的用户配置混淆。
 
+安装版文件名为 `Decimen.Optical.Transfer-v<version>-win7-x64-Setup.exe`，与便携版位于同一目录。安装时可选择目录，默认当前用户安装。文本专用版命令对应为 `desktop:text:win7`、`desktop:text:win7:installer`、`desktop:text:win7:all`，产物位于 `artifacts/desktop/text/win7/`，文件名增加 `.Text`，使用独立 appId。
+
 ## GitHub Actions
 
-独立工作流 **Win7 Desktop**（`.github/workflows/win7-desktop.yml`）：
+官方发布由统一工作流 **Release**（`.github/workflows/release.yml`）负责：推送 `v*` tag 后，桌面矩阵同时构建完整版/文本版的 Windows 10+、Win7、macOS x64/arm64 与麒麟 arm64；全部任务成功后统一校验并发布。Win7 的矩阵项为 `win7-full` 与 `win7-text`，分别调用 `desktop:win7:all` 和 `desktop:text:win7:all`，同时生成便携版与安装版。
+
+独立工作流 **Win7 Desktop**（`.github/workflows/win7-desktop.yml`）现在仅支持手动运行，不再响应 `v*` tag：
 
 - 手动运行：可指定 ref，留空则使用所选分支/tag；默认仅上传构建 artifact。
 - 手动填写 `release_tag`：将构建产物附加到该 Release。
-- 推送 `v*` tag：构建后自动附加到同名 Release。
+- 官方 tag 发布不要使用该工作流，统一走 **Release**。
 
-构建 job 只有读取权限；发布 job 单独授予写入权限。发布前检查 portable EXE、真正应用 EXE 的 x64 PE 头、app.asar 和应用实际报告的 Electron 版本，并生成 SHA256SUMS-win7.txt。portable 外壳可能是 32 位 NSIS，不能用外壳判断应用架构。
+构建 job 只有读取权限；发布 job 单独授予写入权限。工作流调用 `desktop:win7:all`，同时生成便携版与安装版。发布前检查两种 EXE、真正应用 EXE 的 x64 PE 头、app.asar 和应用实际报告的 Electron 版本，并生成覆盖两种产物的 `SHA256SUMS-win7.txt`。仅构建安装版时生成 `SHA256SUMS-win7-setup.txt`；文本版清单对应增加 `text-` 前缀。portable 外壳可能是 32 位 NSIS，不能用外壳判断应用架构。
 
-工作流配置需先推送到 GitHub 才可运行。没有在本次本地修改中触发远端构建或发布。
+工作流配置需先推送到 GitHub 才可运行；正式发布请推送与 package.json 版本一致的 tag。
+
+## 更新
+
+Win7 桌面版固定 Electron 22.3.27，更新通道为 `win7`（完整版）和 `text-win7`（文本专用版），与 Windows 10+ 的 `latest`/`text` 分开；版本、版本类型、平台架构或通道不匹配时拒绝更新，避免串包。安装版在下载校验后可重启并安装；便携版只下载对应便携 EXE 并打开所在目录，由用户手动替换。
+
+传输进行中或有未保存的接收结果时会拒绝重启，并保留已下载的更新；关闭“关于”对话框不会中断下载。应用默认不联网，只有主动点击“检查更新”才访问 GitHub。
+
+更新库 `electron-updater` 6.8.11 仍需在当前 Win7 目标主机上做兼容验证；现有构建与测试不能替代实机兼容认证。首次从旧版本使用应用内更新，需要先手动安装 v1.0.8。
 
 ## 运行与验收
 

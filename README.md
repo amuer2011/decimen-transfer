@@ -16,6 +16,9 @@
 - 暂停保留同一会话与接收进度；终止接收会释放共享、解码线程并清除进度。
 - 传输中不能更换内容或编码设置，避免无意重置接收进度。退出页面前会提示确认。
 - 黑色、白色主题均可手动选择。桌面版记住选择，窗口选择器跟随主题。
+- 桌面版默认不联网。页头“关于”、底部版本号和“帮助 → 关于 / 检查更新”都可打开对话框，主动点击“检查更新”后才访问 GitHub，可查看新版本说明和下载进度。
+- Windows 安装版下载校验后可重启安装；传输中或有未保存结果时拒绝重启，关闭对话框不会中断下载。Windows 便携版下载匹配的便携 EXE 并打开所在目录，需手动替换；macOS 未签名版下载并打开 DMG 手动安装；麒麟下载并打开 DEB，交由系统授权安装。
+- 更新按完整版/文本版与平台架构分通道，不会串包。首次从 v1.0.8 之前的版本使用应用内更新，需先手动安装 v1.0.8。
 - 内容未加密，所有能读取发送画面的接收方都能获取内容。
 
 ## 构建
@@ -42,7 +45,7 @@ npm run desktop:kylin    # Kylin Linux arm64
 artifacts/desktop/win7/Decimen.Optical.Transfer-v<version>-win7-x64.exe
 ```
 
-Win7 工作流为 **Win7 Desktop**（`.github/workflows/win7-desktop.yml`），可单独手动构建；推送 `v*` tag 时构建并附加到 Release。手动运行不填写 `release_tag` 仅生成工作流下载产物。首次使用该工作流，需要先将代码推送到 GitHub。
+桌面发布统一由推送 `v*` tag 触发 **Release** 工作流（`.github/workflows/release.yml`）：一次构建完整版/文本版的 Windows 10+、Win7、macOS 双架构和麒麟 arm64，全部成功后校验并发布。原 **Win7 Desktop** 工作流改为仅手动运行，不再响应 tag；手动运行可单独构建并上传工作流产物，填写 `release_tag` 时附加到该 Release。首次使用该工作流，需要先将代码推送到 GitHub。
 
 Win7 目标为 **6.1.7601 SP1 x64**。Electron 22 已停止维护；目标系统的启动、显卡和窗口采集能力仍需实机验收。[Win7 构建与验证说明](docs/technical/windows7.md)。
 

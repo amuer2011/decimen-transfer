@@ -21,6 +21,7 @@ import { standaloneCsp } from "./build/standalone-csp";
 import { emitAs } from "./build/emit-as";
 import { rootPwaHead } from "./build/root-pwa-head";
 import { licenseBanner } from "./build/license-banner";
+import { textOnlyHtml } from "./build/text-only";
 
 // Where the site is published, used only to make the social-card URLs absolute
 // — scrapers are inconsistent about resolving relative ones. Override with
@@ -82,17 +83,22 @@ const TOKENS = {
 };
 
 export default defineConfig(({ mode }) => {
-  const standalone = mode === "standalone-send" || mode === "standalone-receive";
-  const page = mode === "standalone-send" ? "send" : "receive";
-  const outDir = "dist-standalone";
+  const textOnly = mode === "text" || mode.startsWith("text-standalone-");
+  const buildMode = textOnly ? mode.replace(/^text-/, "") : mode;
+  const standalone = buildMode === "standalone-send" || buildMode === "standalone-receive";
+  const page = buildMode === "standalone-send" ? "send" : "receive";
+  const outDir = textOnly ? "dist-text-standalone" : "dist-standalone";
+  const define = { __TEXT_ONLY__: JSON.stringify(textOnly) };
 
   if (standalone) {
     return {
+      define,
       base: "./",
       // The bundled demo PNGs are fetched by relative URL, which a single file
       // has no way to satisfy — copying them here would just litter the output.
       publicDir: false,
       plugins: [
+        ...(textOnly ? [textOnlyHtml()] : []),
         htmlTokens(TOKENS),
         useInlineVariants(__dirname),
         inlineZxingWasm(),
@@ -100,7 +106,7 @@ export default defineConfig(({ mode }) => {
         standaloneCsp(page),
         viteSingleFile(),
         licenseBanner(pkg.version),
-        emitAs(outDir, `${page}/index.html`, `decimen-${page === "send" ? "sender" : "receiver"}.html`),
+        emitAs(outDir, `${page}/index.html`, `decimen-${textOnly ? "text-" : ""}${page === "send" ? "sender" : "receiver"}.html`),
       ],
       // Workers are bundled in their own Rollup pass and do not inherit the
       // plugin list, so both plugins have to be registered again here.
@@ -116,8 +122,11 @@ export default defineConfig(({ mode }) => {
   }
 
   return {
+    define,
+    publicDir: textOnly ? false : "public",
     base: "./",
     plugins: [
+      ...(textOnly ? [textOnlyHtml(true)] : []),
       htmlTokens(TOKENS),
       basicSsl(),
       VitePWA({
@@ -125,10 +134,11 @@ export default defineConfig(({ mode }) => {
         // We inject our own registration — see rootPwaHead().
         injectRegister: false,
         manifest: {
-          name: "Decimen Optical Transfer",
-          short_name: "Decimen",
-          description:
-            "Send a file or text between two devices with a screen and a camera. No network.",
+          name: textOnly ? "Decimen Text Transfer" : "Decimen Optical Transfer",
+          short_name: textOnly ? "Decimen Text" : "Decimen",
+          description: textOnly
+            ? "Transfer text offline using animated QR codes."
+            : "Send a file or text between two devices with a screen and a camera. No network.",
           theme_color: "#070a11",
           background_color: "#070a11",
           display: "standalone",
@@ -163,7 +173,7 @@ export default defineConfig(({ mode }) => {
           // receiver fills this cache (see servableMediaUrl in receive/main.ts)
           // and workbox's rangeRequests plugin answers AVFoundation's Range
           // probes from it.
-          runtimeCaching: [
+          runtimeCaching: textOnly ? [] : [
             {
               urlPattern: /\/received-media\//,
               handler: "CacheOnly" as const,
@@ -180,6 +190,7 @@ export default defineConfig(({ mode }) => {
       licenseBanner(pkg.version),
     ],
     build: {
+      outDir: textOnly ? "dist-text" : "dist",
       target: "chrome108",
       rollupOptions: {
         input: {

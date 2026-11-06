@@ -4,7 +4,9 @@ const {
   desktopCapturer,
   dialog,
   ipcMain,
+  Menu,
   nativeTheme,
+  net,
   session,
   shell,
   systemPreferences,
@@ -15,8 +17,11 @@ const path = require("node:path");
 const { URL } = require("node:url");
 const { shouldProtectWindow } = require("./content-protection.cjs");
 const { isCompletedDownload, openTargetFolder } = require("./downloads.cjs");
+const { configureUpdates } = require("./updates.cjs");
 
-const PRODUCT_NAME = "Decimen Optical Transfer";
+const PRODUCT_NAME = app.getName().startsWith("decimen-optical-transfer-text")
+  ? "Decimen Optical Transfer Text"
+  : "Decimen Optical Transfer";
 const DIST_ROOT = path.join(app.getAppPath(), "dist");
 // Linux window managers (UKUI included) read _NET_WM_ICON for the taskbar
 // button. Chromium silently drops icons whose pixel payload would push the
@@ -405,6 +410,12 @@ if (!hasSingleInstance) {
     loadAppearance();
     configureDownloads();
     configureDisplayCapture();
+    configureUpdates({ app, ipcMain, net, shell, getWindow: () => mainWindow });
+    Menu.setApplicationMenu(Menu.buildFromTemplate([
+      ...(process.platform === "darwin" ? [{ role: "appMenu" }] : [{ role: "fileMenu" }]),
+      { role: "editMenu" }, { role: "viewMenu" }, { role: "windowMenu" },
+      { label: "帮助", submenu: [{ label: "关于 / 检查更新", click: () => mainWindow?.webContents.send("updates:about") }] },
+    ]));
     return createWindow();
   }).catch((error) => {
     console.error(error);

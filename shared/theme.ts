@@ -1,3 +1,5 @@
+import "./about";
+
 type Theme = "light" | "dark";
 export {};
 declare global {
