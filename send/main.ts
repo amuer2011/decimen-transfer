@@ -24,6 +24,7 @@ import {
 } from "../shared/protocol";
 import { statusLine } from "../shared/status-line";
 import { requestScreenWakeLock } from "../shared/wake-lock";
+import { rememberSettings } from "../shared/transfer-settings";
 
 
 const MARGIN = 4;
@@ -56,6 +57,7 @@ const cfgFps = el("cfg-fps") as HTMLSelectElement;
 const cfgBytes = el("cfg-bytes") as HTMLSelectElement;
 const cfgEcc = el("cfg-ecc") as HTMLSelectElement;
 const cfgSize = el("cfg-size") as HTMLInputElement;
+rememberSettings("send", { fps: cfgFps, frameBytes: cfgBytes, ecc: cfgEcc, displaySize: cfgSize });
 
 let selectedFile: { name: string; size: number; payload: Uint8Array;
   compression: "none" | "gzip"; transmittedSize: number } | null = null;

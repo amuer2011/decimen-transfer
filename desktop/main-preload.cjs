@@ -30,6 +30,11 @@ contextBridge.exposeInMainWorld("decimenAppearance", {
   setTheme: (theme) => ipcRenderer.send("appearance:set", theme),
 });
 
+contextBridge.exposeInMainWorld("decimenSettings", {
+  get: section => ipcRenderer.sendSync("settings:get", section),
+  set: (section, values) => ipcRenderer.sendSync("settings:set", section, values),
+});
+
 contextBridge.exposeInMainWorld("decimenDesktop", {
   onDownloadCompleted(callback) {
     ipcRenderer.once("downloads:completed", () => callback());

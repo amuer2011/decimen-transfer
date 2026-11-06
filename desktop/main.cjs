@@ -18,6 +18,7 @@ const { URL } = require("node:url");
 const { shouldProtectWindow } = require("./content-protection.cjs");
 const { isCompletedDownload, openTargetFolder } = require("./downloads.cjs");
 const { configureUpdates } = require("./updates.cjs");
+const { configureTransferSettings } = require("./settings.cjs");
 
 const PRODUCT_NAME = app.getName().startsWith("decimen-optical-transfer-text")
   ? "Decimen Optical Transfer Text"
@@ -411,6 +412,7 @@ if (!hasSingleInstance) {
     configureDownloads();
     configureDisplayCapture();
     configureUpdates({ app, ipcMain, net, shell, getWindow: () => mainWindow });
+    configureTransferSettings({ app, ipcMain, getWindow: () => mainWindow });
     Menu.setApplicationMenu(Menu.buildFromTemplate([
       ...(process.platform === "darwin" ? [{ role: "appMenu" }] : [{ role: "fileMenu" }]),
       { role: "editMenu" }, { role: "viewMenu" }, { role: "windowMenu" },

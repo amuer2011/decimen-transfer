@@ -115,6 +115,15 @@ unchanged.
 
 Both editions start with a larger QR preview; the size slider, fullscreen zoom, and narrow-screen fitting still apply.
 
+Since v1.0.9, both editions automatically remember sender tuning (FPS, frame
+bytes, ECC and display size) and receiver tuning (capture width/FPS and decode
+workers). Decode workers accept integers from 1 to 32, defaulting to 2, and can
+be changed during reception. Desktop builds store only these settings in
+`transfer-settings.json` under the application's user-data directory, so a new
+local-server port after restart does not lose preferences. Web and standalone
+builds use local storage where available. Transfer content is never persisted
+by this feature.
+
 ## PWA / service worker
 
 `vite-plugin-pwa` (workbox) precaches everything including the 940 KB decoder wasm. Two pieces are custom (`build/root-pwa-head.ts`): manifest/SW references are rewritten to resolve to the site root from any page depth (the build validates this), and the registration script does the skip-waiting handshake — a new deploy takes over open pages with a single reload instead of serving the stale precache forever. A workbox `rangeRequests` route serves received media from the Cache API (see [Platform quirks](platform-quirks.md)).

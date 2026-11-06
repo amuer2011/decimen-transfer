@@ -555,7 +555,8 @@ input:not([type=radio]):not([type=file]):not([type=range]) {
   border-radius: 7px;
   padding: 9px;
 }
-select {
+select,
+.settings input[type=number] {
   margin-top: 6px;
   font-size: 13px;
 }

@@ -23,6 +23,7 @@ import { statusLine } from "../shared/status-line";
 import { requestScreenWakeLock } from "../shared/wake-lock";
 import { TransferClock } from "../shared/transfer-clock";
 import { closeOnBackdropClick } from "../shared/dialog";
+import { rememberSettings } from "../shared/transfer-settings";
 
 declare global {
   interface Window {
@@ -53,7 +54,8 @@ const diagnosticsEl = el("diagnostics") as HTMLDetailsElement;
 const settingsEl = el("settings");
 const cfgWidth = el("cfg-width") as HTMLSelectElement;
 const cfgCapFps = el("cfg-capfps") as HTMLSelectElement;
-const cfgWorkers = el("cfg-workers") as HTMLSelectElement;
+const cfgWorkers = el("cfg-workers") as HTMLInputElement;
+const receiveSettings = rememberSettings("receive", { width: cfgWidth, capFps: cfgCapFps, workers: cfgWorkers });
 const captureActual = el("capture-actual");
 const noSignalToast = el("no-signal");
 const noSignalDialog = el("no-signal-dialog") as HTMLDialogElement;
@@ -114,9 +116,10 @@ async function start(): Promise<void> {
   startBtn.textContent = "正在选择窗口…";
   const gen = ++captureGen;
   try {
+    const settings = receiveSettings();
     const selected = await navigator.mediaDevices.getDisplayMedia({
       audio: false,
-      video: {width: {ideal: Number(cfgWidth.value)}, frameRate: {ideal: Number(cfgCapFps.value)}},
+      video: {width: {ideal: Number(settings.width)}, frameRate: {ideal: Number(settings.capFps)}},
     });
     if (gen !== captureGen) { selected.getTracks().forEach(track => track.stop()); return; }
     stream = selected;
@@ -131,7 +134,7 @@ async function start(): Promise<void> {
     diagnosticsEl.style.display = "block";
     updateReceiveControls();
     setSearchingStatus();
-    pool.resize(Number(cfgWorkers.value));
+    pool.resize(Number(receiveSettings().workers));
     reportCaptureSettings();
     selected.getVideoTracks()[0]?.addEventListener("ended", () => {
       if (stream !== selected || done) return;
@@ -174,7 +177,8 @@ async function resumeReceive(): Promise<void> {
     if (!stream || done || gen !== captureGen) return;
     paused = false;
     clock.resume();
-    pool.resize(Number(cfgWorkers.value));
+    pool.resize(Number(receiveSettings().workers));
+    reportCaptureSettings();
     resetNoSignal();
     if (!decoder) noSignal.captureStarted(performance.now());
     setSearchingStatus();
@@ -221,10 +225,11 @@ function reportCaptureSettings(): void {
 }
 async function applyReceiveSettings(): Promise<void> {
   if (!stream || done) return;
-  if (!paused) pool.resize(Number(cfgWorkers.value));
+  const settings = receiveSettings();
+  if (!paused) pool.resize(Number(settings.workers));
   const selected = stream;
   try {
-    await selected.getVideoTracks()[0]?.applyConstraints({width: {ideal: Number(cfgWidth.value)}, frameRate: {ideal: Number(cfgCapFps.value)}});
+    await selected.getVideoTracks()[0]?.applyConstraints({width: {ideal: Number(settings.width)}, frameRate: {ideal: Number(settings.capFps)}});
     if (stream === selected) reportCaptureSettings();
   } catch { captureActual.textContent = "采集源不接受当前设置；继续使用原有画面。重新选择窗口可重试。"; }
 }
