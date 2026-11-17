@@ -368,6 +368,10 @@ async function createWindow() {
       nodeIntegration: false,
       preload: path.join(__dirname, "main-preload.cjs"),
       sandbox: true,
+      // Background transfer: keep rAF/RVFC and timers running at full rate
+      // when this window is hidden or occluded, so a transfer keeps going
+      // while the user works in another app on a single screen.
+      backgroundThrottling: false,
     },
   });
   mainWindow = window;
