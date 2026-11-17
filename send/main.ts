@@ -378,11 +378,10 @@ async function startStream(revealStage = false) {
 
   const interval = 1000 / txFps;
   let nextAt = performance.now();
-  const tick = (now: number) => {
-    // generatorFailed means no frame will ever be produced again, so stop the
-    // rAF loop rather than spinning on an empty queue until a settings change.
-    if (gen !== generation || generatorFailed) return;
-    requestAnimationFrame(tick);
+  // Draw at most one queued frame for the given timestamp. Shared by the
+  // rAF loop (foreground) and the timer below (background) — both are
+  // guarded by nextAt, so a stray extra call is a harmless no-op.
+  const step = (now: number): void => {
     if (paused) { nextAt = now; return; }
     if (now < nextAt) return;
     const img = queue.shift();
@@ -398,5 +397,37 @@ async function startStream(revealStage = false) {
     nextAt += interval;
     if (now - nextAt > 3 * interval) nextAt = now + interval; // fell behind — don't burst
   };
+  const tick = (now: number) => {
+    // generatorFailed means no frame will ever be produced again, so stop the
+    // rAF loop rather than spinning on an empty queue until a settings change.
+    if (gen !== generation || generatorFailed) { stopBackgroundTimer(); return; }
+    if (!document.hidden) requestAnimationFrame(tick);
+    step(now);
+  };
+  // requestAnimationFrame stops firing entirely while the tab is hidden, so
+  // a transfer used to freeze the moment the user switched to another app.
+  // Fall back to a timer while hidden: the QR keeps advancing (at the
+  // configured fps, best effort — Chrome throttles background timers, so
+  // this is slower than foreground, not a full-speed replacement). This
+  // only helps when the QR is still visible to the receiver — e.g. on a
+  // second monitor or in a separate window — because a covered QR cannot
+  // be photographed no matter how fast it advances. Fountain codes mean
+  // the receiver simply resumes from the frames it missed.
+  let backgroundTimer: ReturnType<typeof setInterval> | undefined;
+  const stopBackgroundTimer = (): void => {
+    if (backgroundTimer !== undefined) { clearInterval(backgroundTimer); backgroundTimer = undefined; }
+  };
+  const startBackgroundTimer = (): void => {
+    if (backgroundTimer !== undefined) return;
+    backgroundTimer = setInterval(() => {
+      if (gen !== generation || generatorFailed) { stopBackgroundTimer(); return; }
+      step(performance.now());
+    }, interval);
+  };
+  document.addEventListener("visibilitychange", () => {
+    if (gen !== generation || generatorFailed) { stopBackgroundTimer(); return; }
+    if (document.hidden) startBackgroundTimer();
+    else { stopBackgroundTimer(); requestAnimationFrame(tick); }
+  });
   requestAnimationFrame(tick);
 }

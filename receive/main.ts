@@ -160,6 +160,7 @@ function pauseReceive(): void {
   clock.pause();
   video.pause();
   pool.resize(0); // Drop in-flight frames so a resumed transfer cannot accept stale work.
+  stopBackgroundCapture();
   clearInterval(statsTimer);
   statsTimer = undefined;
   captureTimes.length = decodeTimes.length = 0;
@@ -196,6 +197,7 @@ function cancelReceive(): void {
   previous?.getTracks().forEach(track => track.stop());
   video.pause(); video.srcObject = null;
   pool.resize(0);
+  stopBackgroundCapture();
   clearInterval(statsTimer); statsTimer = undefined;
   paused = false; starting = false; done = false;
   resultSaved = false;
@@ -273,10 +275,39 @@ function restartButton(label: string): HTMLButtonElement {
 
 type VideoRVFC = HTMLVideoElement & { requestVideoFrameCallback?: (cb: () => void) => number };
 
+// requestVideoFrameCallback / requestAnimationFrame both stop firing while
+// the tab is hidden, so receiving used to freeze the moment the user
+// switched to another app. While hidden, poll the video element on a
+// timer instead — getDisplayMedia keeps delivering frames in the
+// background, and drawImage() can still read the latest one. Best
+// effort: Chrome throttles background timers (down to ~1/s after a
+// while), so this is slower than foreground, not a full-speed
+// replacement — but the transfer keeps moving instead of stopping.
+// It only helps while the captured sender window is still updating
+// (e.g. on a second monitor); a minimized / fully covered source
+// delivers frozen frames on every OS, and no code can fix that.
+let backgroundCaptureTimer: ReturnType<typeof setInterval> | undefined;
+let captureLoopRunning = false;
+const stopBackgroundCapture = (): void => {
+  if (backgroundCaptureTimer !== undefined) { clearInterval(backgroundCaptureTimer); backgroundCaptureTimer = undefined; }
+};
+const startBackgroundCapture = (gen: number): void => {
+  if (backgroundCaptureTimer !== undefined) return;
+  const period = Math.max(50, 1000 / Number(receiveSettings().capFps));
+  backgroundCaptureTimer = setInterval(() => {
+    if (done || paused || !stream || gen !== captureGen) { stopBackgroundCapture(); return; }
+    captureFrame();
+  }, period);
+};
+
 function scheduleFrame(gen: number) {
-  if (done || paused || !stream || gen !== captureGen) return;
+  if (done || paused || !stream || gen !== captureGen) { captureLoopRunning = false; return; }
+  if (captureLoopRunning) return;
+  if (document.hidden) { startBackgroundCapture(gen); return; }
+  captureLoopRunning = true;
   const v = video as VideoRVFC;
   const next = () => {
+    captureLoopRunning = false;
     if (done || paused || !stream || gen !== captureGen) return;
     captureFrame();
     scheduleFrame(gen);
@@ -284,6 +315,13 @@ function scheduleFrame(gen: number) {
   if (v.requestVideoFrameCallback) v.requestVideoFrameCallback(next);
   else requestAnimationFrame(next);
 }
+
+document.addEventListener("visibilitychange", () => {
+  if (done || paused || !stream) { stopBackgroundCapture(); return; }
+  const gen = captureGen;
+  if (document.hidden) startBackgroundCapture(gen);
+  else { stopBackgroundCapture(); scheduleFrame(gen); }
+});
 
 const grab = document.createElement("canvas");
 let frameId = 0;
@@ -384,6 +422,7 @@ async function finish(container: Uint8Array, hashOk: boolean, seconds: number) {
 
   video.pause();
   video.srcObject = null;
+  stopBackgroundCapture();
   clearInterval(statsTimer);
   statsTimer = undefined;
   pool.resize(0);
